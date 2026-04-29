@@ -1,0 +1,12 @@
+# Sensitive data
+.env
+*.pem
+*.key
+
+# Evidence (logs grandes)
+evidence/*.log
+evidence/*.png
+
+# OS files
+.DS_Store
+Thumbs.db
