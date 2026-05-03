@@ -1,0 +1,8 @@
+#!/bin/bash
+echo "🔍 Correlación de eventos (última hora):"
+echo "=== Intentos SSH fallidos ==="
+journalctl -u ssh --since "1 hour ago" 2>/dev/null | grep -c "Failed password"
+echo "=== Conexiones establecidas ==="
+ss -tn state established | awk '{print $5}' | cut -d: -f1 | sort -u | head -10
+echo "=== Procesos con alta CPU ==="
+ps aux --sort=-%cpu | head -5

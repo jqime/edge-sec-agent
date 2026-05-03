@@ -1,0 +1,9 @@
+#!/bin/bash
+SNAPSHOT_DIR="/root/forensics/$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$SNAPSHOT_DIR"
+ps auxf > "$SNAPSHOT_DIR/processes.txt"
+netstat -tulnp > "$SNAPSHOT_DIR/connections.txt" 2>/dev/null
+last -n 50 > "$SNAPSHOT_DIR/logins.txt"
+find / -mtime -1 -type f 2>/dev/null | head -20 > "$SNAPSHOT_DIR/recent_files.txt"
+journalctl -xe --since "1 hour ago" > "$SNAPSHOT_DIR/systemd_journal.txt" 2>/dev/null
+echo "📸 Snapshot forense guardado en $SNAPSHOT_DIR"

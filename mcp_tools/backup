@@ -1,0 +1,12 @@
+#!/bin/bash
+BACKUP_DIR="/root/backups/$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$BACKUP_DIR"
+cp -r /etc/ssh "$BACKUP_DIR/" 2>/dev/null
+cp -r /etc/ufw "$BACKUP_DIR/" 2>/dev/null
+cp /etc/fail2ban/jail.local "$BACKUP_DIR/" 2>/dev/null || true
+cp /etc/fail2ban/jail.d/* "$BACKUP_DIR/" 2>/dev/null || true
+cp /root/edge-sec-agent/memory.db "$BACKUP_DIR/" 2>/dev/null
+echo "✅ Respaldo completado en $BACKUP_DIR"
+# Opcional: comprimir y limpiar backups antiguos
+tar -czf "$BACKUP_DIR.tar.gz" "$BACKUP_DIR" && rm -rf "$BACKUP_DIR"
+find /root/backups/ -name "*.tar.gz" -mtime +7 -delete

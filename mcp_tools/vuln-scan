@@ -1,0 +1,3 @@
+#!/bin/bash
+echo "🔍 Escaneo rápido de vulnerabilidades (lynis):"
+lynis audit system --quick 2>/dev/null | grep -E "(WARNING|SUGGESTION)" | head -15
