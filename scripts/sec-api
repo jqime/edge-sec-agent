@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import subprocess, json, sys
+import subprocess, json
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 class Handler(BaseHTTPRequestHandler):

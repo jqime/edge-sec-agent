@@ -2,17 +2,13 @@
 case "$1" in
     isolate)
         iptables -P INPUT DROP; iptables -P OUTPUT DROP; iptables -P FORWARD DROP
-        echo "🔒 Sistema aislado completamente de la red"
+        echo "🔒 Sistema aislado"
         ;;
     lockdown)
         port="${2:-22}"
         iptables -A INPUT -p tcp --dport $port -j DROP
         echo "🔐 Puerto $port bloqueado"
         ;;
-    status)
-        iptables -L INPUT -n | head -5
-        ;;
-    *)
-        echo "Uso: ir-response {isolate|lockdown|status} [puerto]"
-        ;;
+    status) iptables -L INPUT -n | head -5 ;;
+    *) echo "Uso: ir-response {isolate|lockdown|status} [puerto]"
 esac

@@ -38,70 +38,78 @@ git clone https://github.com/jqime/edge-sec-agent.git
 cd edge-sec-agent
 cp scripts/sec scripts/sec-chat scripts/sec-agent scripts/ia /usr/local/bin/
 chmod +x /usr/local/bin/sec /usr/local/bin/sec-chat /usr/local/bin/sec-agent /usr/local/bin/ia
-Requisitos previos: Ollama instalado (curl -fsSL https://ollama.com/install.sh | sh) y al menos un modelo descargado (ollama pull qwen2.5:0.5b).
+Requisitos previos:
 
+bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull qwen2.5:0.5b
 🔧 Comandos disponibles
 ⚡ sec – información del sistema en <1s
 Comando	Descripción
 sec status	IP, RAM, temperatura, puertos abiertos, fallos SSH
 sec red	Dispositivos en la red local (ARP)
-sec puertos	Puertos en escucha (ss -tlnp)
+sec puertos	Puertos en escucha
 sec procesos	Procesos con mayor uso de CPU
 sec temp	Temperatura del procesador
 sec ram	Uso de memoria RAM
-🧠 sec-agent – selector automático (recomendado para uso general)
-Detecta si la consulta es operativa (usa reglas rápidas) o conversacional (usa IA).
+
+
+🧠 sec-agent – selector automático
+Detecta si la consulta es operativa (reglas rápidas) o conversacional (IA).
 
 bash
 sec-agent "estado del sistema"            # reglas: <2s
 sec-agent "¿cómo mejorar la seguridad?"   # IA: 10-90s
-🤖 ia – IA conversacional directa (rápida con qwen2.5:0.5b)
+🤖 ia – IA conversacional directa
 bash
 ia "¿qué puertos están abiertos?"
 ia "dame consejos de seguridad para SSH"
 🛠️ sec-chat – planificador por reglas y herramientas MCP
-Modo	Ejemplo	Acción
---plan	sec-chat --plan "estado del firewall"	Ejecuta tareas comunes (instantáneo)
---tool	sec-chat --tool security-score	Ejecuta script MCP
-(ninguno)	sec-chat "pregunta"	IA conversacional (lento, 60-90s)
-Reglas disponibles en --plan
-fallos ssh – muestra intentos de login fallidos (lastb)
+Modo reglas (--plan)
+Regla	Acción
+fallos ssh	Muestra intentos fallidos
+estado del firewall	Reglas UFW
+actualizar paquetes	Lista actualizaciones
+fail2ban status	Estado de fail2ban
+reiniciar docker	Reinicia Docker
+escanear puertos localhost	Nmap
+bloquear ip X	iptables
 
-estado del firewall – muestra reglas UFW
 
-actualizar paquetes – lista paquetes actualizables
+Ejemplo:
 
-fail2ban status – estado de fail2ban
-
-reiniciar docker – reinicia el servicio Docker
-
-escanear puertos localhost – escanea puertos abiertos con nmap
-
-bloquear ip 192.168.1.100 – bloquea una IP mediante iptables
-
-Herramientas MCP (sec-chat --tool)
+bash
+sec-chat --plan "estado del firewall"
+Herramientas MCP (--tool)
 Herramienta	Función
-harden	Hardening básico (IPv6, MaxAuthTries, puertos abiertos)
-audit	Auditoría de seguridad (fallos SSH, sudo, servicios expuestos)
+harden	Hardening básico
+audit	Auditoría de seguridad
+security-score	Puntuación 0–100
+forensic-snapshot	Instantánea forense
+event-correlator	Correlación de eventos
+ir-response	Respuesta a incidentes
+custom-report	Informes diarios/semanales
+backup	Respaldo de configuraciones
+vuln-scan	Escaneo Lynis
 saludo	Ejemplo para crear tus propias herramientas
-security-score	Puntuación de seguridad (0-100) basada en firewall, fail2ban, SSH
-forensic-snapshot	Crea una instantánea forense del sistema (procesos, conexiones, logs, archivos recientes)
-event-correlator	Correlación de eventos (fallos SSH, conexiones establecidas, CPU alta)
-ir-response	Respuesta a incidentes: isolate (aisla red), lockdown <puerto> (bloquea puerto), status
-custom-report	Genera informes diarios (daily) o semanales (weekly)
-backup	Respaldo automático de configuraciones críticas (SSH, UFW, fail2ban)
-vuln-scan	Escaneo rápido de vulnerabilidades con Lynis
-Ejemplo: sec-chat --tool security-score
 
-Para crear tu propia herramienta MCP, añade un script ejecutable en ~/mcp_tools/ y ejecútalo con sec-chat --tool nombre.
 
+Ejemplo:
+
+bash
+sec-chat --tool security-score
+Crear herramientas personalizadas:
+
+bash
+~/mcp_tools/mi_script
+sec-chat --tool mi_script
 🔌 API REST
-El agente expone una API REST en el puerto 8765 (servicio systemd sec-api.service activo por defecto).
+Servicio activo en el puerto 8765.
 
-Endpoint: POST /ask
-
-Ejemplo con curl:
-
+Endpoint
+Código
+POST /ask
+Ejemplo
 bash
 curl -X POST http://localhost:8765/ask \
   -H "Content-Type: application/json" \
@@ -110,69 +118,76 @@ Respuesta:
 
 json
 {"respuesta": "IP 192.168.1.141 | RAM 1.9Gi/3.8Gi | Temp 34.1C | Puertos 22 3000 8765 ... | Fallos SSH 2"}
-Puedes preguntar cualquier cosa que entendería sec-agent (estado, red, puertos, etc.).
-
-🐳 Contenedor opcional: OpenWebUI
-Si tienes Docker, despliega una interfaz web para chatear con tus modelos de Ollama:
-
+🐳 OpenWebUI (opcional)
 bash
-docker run -d --name openwebui --add-host host.docker.internal:host-gateway -p 3000:8080 --restart unless-stopped ghcr.io/open-webui/open-webui:main
-Accede en http://192.168.1.141:3000 (sustituye por tu IP).
+docker run -d --name openwebui \
+  --add-host host.docker.internal:host-gateway \
+  -p 3000:8080 --restart unless-stopped \
+  ghcr.io/open-webui/open-webui:main
+Accede en:
 
+Código
+http://TU_IP:3000
 📊 Monitorización automática (cron)
-El agente instala automáticamente un cron (durante la instalación) que:
+El agente instala tareas que:
 
-Cada 10 minutos comprueba si hay más de 5 fallos SSH y envía alerta a Telegram.
+Cada 10 min → alerta si hay >5 fallos SSH
 
-Cada 5 minutos verifica la temperatura; si supera 60 °C, lanza alerta.
+Cada 5 min → alerta si la temperatura >60 °C
 
-Cada hora envía el estado completo del sistema por Telegram.
+Cada 1 hora → envía estado completo del sistema
 
-Para revisar las alertas:
+Logs:
 
 bash
 grep "sec" /var/log/syslog
 ⚡ Rendimiento real en Orange Pi Zero 3
 Operación	Tiempo
-sec status	< 1 segundo
-sec-chat --plan	< 2 segundos
-sec-agent (operativo)	< 2 segundos
-Herramienta MCP	< 2 segundos
-ia (modelo rápido qwen2.5:0.5b)	10‑20 segundos
-ia (modelo calidad qwen2.5:3b)	60‑90 segundos
-La IA es lenta debido al hardware (4 núcleos ARM, sin GPU). Para el día a día, usa los comandos rápidos (sec, sec-chat --plan) – son más que suficientes para tareas de administración y seguridad.
+sec status	<1s
+sec-chat --plan	<2s
+sec-agent (operativo)	<2s
+Herramienta MCP	<2s
+ia qwen2.5:0.5b	10–20s
+ia qwen2.5:3b	60–90s
+
 
 🔒 Seguridad
-Todo el código y los modelos se ejecutan localmente (sin envío de datos a la nube).
+Todo funciona offline, sin nube ni telemetría.
 
-Los comandos peligrosos (rm, dd, mkfs, etc.) están bloqueados en el planificador.
+Comandos peligrosos bloqueados (rm, dd, mkfs, etc.).
 
-Las herramientas MCP se ejecutan con los permisos del usuario, no como root.
+MCP se ejecuta sin privilegios elevados.
 
-El acceso SSH está protegido por fail2ban (recomendado) y se puede cambiar el puerto por defecto.
+API REST sin ejecución arbitraria.
+
+IA aislada del shell.
+
+Recomendado: fail2ban + cambio de puerto SSH.
 
 🗺️ Roadmap
 Comandos rápidos (sec)
 
-Planificador por reglas (sec-chat --plan)
+Reglas (sec-chat --plan)
 
-Herramientas MCP (sec-chat --tool)
+Herramientas MCP
 
 Monitorización por cron
 
-OpenWebUI como interfaz web opcional
+OpenWebUI
 
-API REST (sec-agent --api)
+API REST
 
 Selector automático (sec-agent)
 
-IA conversacional directa (ia)
+IA conversacional (ia)
 
-Modo demonio con alertas personalizables (opcional, sec-daemon)
+Modo demonio (sec-daemon)
 
-Soporte multi‑modelo configurable (vía EDGE_MODEL)
+Multi‑modelo (EDGE_MODEL)
 
 📄 Licencia
 MIT © Jaime Muñoz
 
-<p align="center"> <sub>Hecho con ❤️ para la comunidad DevSecOps en el borde – sin cloud, sin GPU, sin excusas.</sub> </p> ```
+<p align="center">
+<sub>Hecho con ❤️ para la comunidad DevSecOps en el borde – sin cloud, sin GPU, sin excusas.</sub>
+</p>
