@@ -15,7 +15,5 @@ case "$1" in
         done
         echo "Reporte semanal guardado en $FILE"
         ;;
-    *)
-        echo "Uso: custom-report {daily|weekly}"
-        ;;
+    *) echo "Uso: custom-report {daily|weekly}"
 esac
