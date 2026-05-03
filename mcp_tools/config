@@ -1,0 +1,16 @@
+#!/bin/bash
+# Cargar configuración centralizada
+
+CONFIG_FILE="/etc/edge-sec-agent.conf"
+
+if [ -f "$CONFIG_FILE" ]; then
+    source "$CONFIG_FILE"
+    export EDGE_IP EDGE_API_PORT EDGE_MODEL EDGE_MODEL_FAST EDGE_MODEL_QUALITY
+    export EDGE_MAX_FAILED_LOGINS EDGE_TEMP_THRESHOLD EDGE_BLOCK_DURATION
+    export EDGE_TELEGRAM_TOKEN EDGE_TELEGRAM_CHAT_ID EDGE_LOG_LEVEL EDGE_LOG_FILE
+    export EDGE_BACKUP_DIR EDGE_BACKUP_RETENTION
+    return 0
+else
+    echo "ADVERTENCIA: No se encontró el archivo de configuración $CONFIG_FILE"
+    return 1
+fi

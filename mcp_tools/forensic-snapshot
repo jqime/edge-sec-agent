@@ -1,9 +1,62 @@
 #!/bin/bash
-SNAPSHOT_DIR="/root/forensics/$(date +%Y%m%d_%H%M%S)"
-mkdir -p "$SNAPSHOT_DIR"
-ps auxf > "$SNAPSHOT_DIR/processes.txt"
-netstat -tulnp > "$SNAPSHOT_DIR/connections.txt" 2>/dev/null
-last -n 50 > "$SNAPSHOT_DIR/logins.txt"
-find / -mtime -1 -type f 2>/dev/null | head -20 > "$SNAPSHOT_DIR/recent_files.txt"
-journalctl -xe --since "1 hour ago" > "$SNAPSHOT_DIR/systemd_journal.txt" 2>/dev/null
-echo "📸 Snapshot forense guardado en $SNAPSHOT_DIR"
+# Sistema de análisis forense para Orange Pi Zero 3
+
+SNAPSHOT_DIR="/root/forensics/\$(date +%Y%m%d_%H%M%S)"
+mkdir -p "\$SNAPSHOT_DIR"
+
+echo "📸 Creando snapshot forense en \$SNAPSHOT_DIR..."
+
+# Información del sistema
+uname -a > "\$SNAPSHOT_DIR/system_info.txt"
+uptime >> "\$SNAPSHOT_DIR/system_info.txt"
+
+# Procesos en ejecución
+ps auxf > "\$SNAPSHOT_DIR/processes.txt"
+ps -eo pid,ppid,cmd,%mem,%cpu --sort=-%mem > "\$SNAPSHOT_DIR/processes_memory.txt"
+ps -eo pid,ppid,cmd,%mem,%cpu --sort=-%cpu > "\$SNAPSHOT_DIR/processes_cpu.txt"
+
+# Conexiones de red
+netstat -tulnp > "\$SNAPSHOT_DIR/connections.txt" 2>/dev/null
+ss -tulnp > "\$SNAPSHOT_DIR/ss_connections.txt"
+ss -tn state established > "\$SNAPSHOT_DIR/established_connections.txt"
+
+# Logs de acceso
+last -n 50 > "\$SNAPSHOT_DIR/logins.txt"
+lastb -n 50 > "\$SNAPSHOT_DIR/failed_logins.txt" 2>/dev/null
+
+# Archivos modificados recientemente
+find /etc -mtime -1 -type f 2>/dev/null > "\$SNAPSHOT_DIR/modified_etc.txt"
+find /var/log -mtime -1 -type f 2>/dev/null > "\$SNAPSHOT_DIR/modified_logs.txt"
+
+# Logs del sistema
+journalctl --since "1 hour ago" > "\$SNAPSHOT_DIR/systemd_journal.txt"
+journalctl -u ssh --since "1 hour ago" > "\$SNAPSHOT_DIR/ssh_journal.txt" 2>/dev/null
+
+# Información de hardware
+cat /proc/meminfo > "\$SNAPSHOT_DIR/memory_info.txt"
+cat /proc/cpuinfo > "\$SNAPSHOT_DIR/cpu_info.txt"
+cat /sys/class/thermal/thermal_zone0/temp > "\$SNAPSHOT_DIR/temp_raw.txt"
+echo "\$(cat /sys/class/thermal/thermal_zone0/temp | cut -c1-2)°C" > "\$SNAPSHOT_DIR/temperature.txt"
+
+# Información de discos
+df -h > "\$SNAPSHOT_DIR/disk_usage.txt"
+lsblk > "\$SNAPSHOT_DIR/block_devices.txt"
+
+# Configuraciones críticas
+[ -f /etc/ssh/sshd_config ] && cp /etc/ssh/sshd_config "\$SNAPSHOT_DIR/sshd_config.txt"
+[ -f /etc/fail2ban/jail.local ] && cp /etc/fail2ban/jail.local "\$SNAPSHOT_DIR/fail2ban_config.txt" 2>/dev/null
+iptables -L -n > "\$SNAPSHOT_DIR/iptables.txt" 2>/dev/null
+
+# Resumen ejecutivo
+echo "=== RESUMEN FORENSE ===" > "\$SNAPSHOT_DIR/summary.txt"
+echo "Fecha: $(date)" >> "$SNAPSHOT_DIR/summary.txt"
+echo "Hostname: $(hostname)" >> "$SNAPSHOT_DIR/summary.txt"
+echo "IP: $(ip route get 1 | awk '{print $7}' | head -1)" >> "\$SNAPSHOT_DIR/summary.txt"
+echo "Temperatura: \$(cat $SNAPSHOT_DIR/temperature.txt)" >> "$SNAPSHOT_DIR/summary.txt"
+echo "Uso de RAM: $(free -h | grep Mem | awk '{print $3"/"$2}')" >> "$SNAPSHOT_DIR/summary.txt"
+echo "Conexiones establecidas: \$(cat \$SNAPSHOT_DIR/established_connections.txt | wc -l)" >> "\$SNAPSHOT_DIR/summary.txt"
+echo "Intentos de login fallidos (últimos 50): \$(cat \$SNAPSHOT_DIR/failed_logins.txt | wc -l)" >> "\$SNAPSHOT_DIR/summary.txt"
+
+echo "✅ Snapshot forense completado en \$SNAPSHOT_DIR"
+echo "📋 Resumen guardado en \$SNAPSHOT_DIR/summary.txt"
+echo "🔍 Para revisar rápidamente: cat \$SNAPSHOT_DIR/summary.txt"
