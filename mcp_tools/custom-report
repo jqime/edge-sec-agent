@@ -1,0 +1,21 @@
+#!/bin/bash
+OUTPUT_DIR="/root/reports"
+mkdir -p "$OUTPUT_DIR"
+case "$1" in
+    daily)
+        FILE="$OUTPUT_DIR/daily_$(date +%Y%m%d).txt"
+        sec status > "$FILE"
+        echo "Reporte diario guardado en $FILE"
+        ;;
+    weekly)
+        FILE="$OUTPUT_DIR/weekly_$(date +%Y%m%d).txt"
+        for i in {0..6}; do
+            echo "--- $(date -d "$i days ago" +%Y-%m-%d) ---" >> "$FILE"
+            sec status >> "$FILE"
+        done
+        echo "Reporte semanal guardado en $FILE"
+        ;;
+    *)
+        echo "Uso: custom-report {daily|weekly}"
+        ;;
+esac

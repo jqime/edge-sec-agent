@@ -1,0 +1,13 @@
+#!/bin/bash
+SCORE=100
+[ $(ufw status 2>/dev/null | grep -c "Status: active") -eq 0 ] && SCORE=$((SCORE-20))
+[ $(systemctl is-active fail2ban 2>/dev/null) != "active" ] && SCORE=$((SCORE-15))
+[ $(grep -c "^PermitRootLogin yes" /etc/ssh/sshd_config 2>/dev/null) -gt 0 ] && SCORE=$((SCORE-25))
+[ $(grep -c "^PasswordAuthentication yes" /etc/ssh/sshd_config 2>/dev/null) -gt 0 ] && SCORE=$((SCORE-15))
+echo "🔐 Puntuación de seguridad: $SCORE/100"
+case $SCORE in
+    100) echo "✅ Excelente";;
+    [8-9][0-9]) echo "👍 Bueno";;
+    [6-7][0-9]) echo "⚠️ Mejorable";;
+    *) echo "🔥 Crítico";;
+esac

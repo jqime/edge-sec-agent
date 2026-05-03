@@ -1,25 +1,7 @@
 #!/bin/bash
-# IA simple para Orange Pi Zero 3 - usa ollama run
 if [ -z "$1" ]; then
     echo "Uso: ia 'tu pregunta'"
     exit 1
 fi
-
 MODEL="${EDGE_MODEL:-qwen2.5:0.5b}"
-echo -n "🤖 $MODEL pensando"
-# Mostrar puntos mientras espera (en segundo plano)
-while true; do echo -n .; sleep 1; done &
-SPIN=$!
-
-# Llamar a ollama run con timeout de 30 segundos
-RES=$(timeout 30s ollama run "$MODEL" "$1" 2>/dev/null)
-
-# Matar spinner
-kill $SPIN 2>/dev/null
-echo ""
-
-if [ -z "$RES" ]; then
-    echo "⚠️ Tiempo agotado (30s). Usa 'sec status' para info inmediata."
-else
-    echo "$RES"
-fi
+timeout 90s ollama run "$MODEL" "$1"
