@@ -1,12 +1,43 @@
-# Sensitive data
-.env
-*.pem
-*.key
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+*.whl
 
-# Evidence (logs grandes)
-evidence/*.log
-evidence/*.png
+# Entornos virtuales
+.venv/
+venv/
+env/
 
-# OS files
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Secretos y configuración local
+.env
+.env.local
+secrets/
+config/local.yaml
+
+# Ollama (modelos descargados — no versionar)
+models/
+*.gguf
+*.bin
+
+# Datos temporales del agente
+data/
+tmp/
