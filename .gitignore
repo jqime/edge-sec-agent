@@ -4,3 +4,4 @@ __pycache__/
 memory.json
 .env
 .DS_Store
+memory.db
