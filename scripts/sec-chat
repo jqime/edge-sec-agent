@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+import subprocess, sys, json, os, time, urllib.request
+
+# ========== CONFIG ==========
+OLLAMA_URL = "http://localhost:11434/api/generate"
+MODEL = "tinyllama:1.1b"
+TIMEOUT_IA = 90          # segundos para IA
+MEMORY_FILE = os.path.expanduser("~/.sec_chat_memory.json")
+MCP_DIR = os.path.expanduser("~/mcp_tools")
+os.makedirs(MCP_DIR, exist_ok=True)
+
+# ========== MEMORIA ==========
+def load_memory():
+    if os.path.exists(MEMORY_FILE):
+        with open(MEMORY_FILE) as f:
+            return json.load(f)
+    return []
+def save_memory(hist):
+    with open(MEMORY_FILE, "w") as f:
+        json.dump(hist[-30:], f, indent=2)
+
+# ========== COMANDOS RÁPIDOS ==========
+def run(cmd, timeout=10):
+    try:
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        return (r.stdout.strip() or r.stderr.strip())[:2000]
+    except:
+        return "[error]"
+
+def get_status():
+    ip = run("hostname -I | awk '{print $1}'")
+    ram = run("free -h | awk '/Mem/{print $3\"/\"$2}'")
+    t = run("cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null")
+    temp = f"{int(t)/1000:.1f}C" if t.isdigit() else "?"
+    ports = run("ss -tlnp | awk 'NR>1{print $4}' | rev | cut -d: -f1 | rev | sort -n | uniq | tr '\n' ' '")
+    fail = run("lastb 2>/dev/null | wc -l")
+    return f"IP {ip} | RAM {ram} | Temp {temp} | Puertos {ports} | Fallos SSH {fail}"
+
+# ========== PLANIFICADOR POR REGLAS (sin IA, rápido) ==========
+def plan_by_rules(desc):
+    d = desc.lower()
+    steps = []
+    if "docker" in d:
+        if "instala" in d or "install" in d:
+            steps.append("apt update && apt install -y docker.io && systemctl enable --now docker")
+        elif "start" in d or "inicia" in d:
+            steps.append("systemctl start docker")
+        elif "status" in d:
+            steps.append("systemctl status docker --no-pager")
+    if "ufw" in d or "firewall" in d:
+        if "permitir" in d or "allow" in d:
+            steps.append("ufw allow 2375")
+        if "activar" in d or "enable" in d:
+            steps.append("ufw enable")
+    if "nginx" in d and "despliega" in d:
+        steps.append("docker run -d --name nginx -p 80:80 nginx")
+    if "fallos" in d or "failed" in d:
+        steps.append("lastb | head -20")
+    if "temperatura" in d or "temp" in d:
+        steps.append("sec temp")
+    if not steps:
+        return None   # no hay regla
+    return steps
+
+# ========== IA (solo conversación) ==========
+def ask_ollama(prompt):
+    full = f"Datos del sistema: {get_status()}\n\nUsuario: {prompt}\nAgente:"
+    data = json.dumps({"model": MODEL, "prompt": full, "stream": False,
+                       "options": {"num_predict": 200, "temperature": 0.3}}).encode()
+    req = urllib.request.Request(OLLAMA_URL, data=data, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT_IA) as resp:
+            return json.loads(resp.read()).get("response", "")
+    except:
+        return None
+
+# ========== CHAT CON MEMORIA ==========
+def chat(pregunta, history):
+    ctx = ""
+    for h in history[-3:]:
+        ctx += f"Usuario: {h['q']}\nAgente: {h['a']}\n"
+    return ask_ollama(ctx + pregunta)
+
+# ========== MCP ==========
+def mcp_call(tool, args):
+    path = os.path.join(MCP_DIR, tool)
+    if not os.path.exists(path):
+        return f"Herramienta '{tool}' no encontrada."
+    if not os.access(path, os.X_OK):
+        os.chmod(path, 0o755)
+    return run(f"{path} {args}")
+
+# ========== MAIN ==========
+def main():
+    if len(sys.argv) < 2:
+        print("Uso: sec-chat 'pregunta'")
+        print("      sec-chat --plan 'descripción tarea'")
+        print("      sec-chat --tool nombre [args]")
+        return
+
+    history = load_memory()
+
+    # Modo planificador
+    if sys.argv[1] == "--plan" and len(sys.argv) > 2:
+        desc = " ".join(sys.argv[2:])
+        steps = plan_by_rules(desc)
+        if not steps:
+            print("⚠️ No se detectó una tarea común. Intenta con: instala docker, configura ufw, despliega nginx, etc.")
+            return
+        print("\n📌 Plan generado (ejecución inmediata):")
+        for i, s in enumerate(steps, 1):
+            print(f"  {i}. {s}")
+        confirm = input("\n¿Ejecutar? (s/n): ").strip().lower()
+        if confirm in ('s', 'si', 'sí', 'y'):
+            for step in steps:
+                print(f"\n▶️ {step}")
+                print(run(step, timeout=60))
+        else:
+            print("Cancelado.")
+        return
+
+    # Modo herramienta MCP
+    if sys.argv[1] == "--tool" and len(sys.argv) > 2:
+        tool = sys.argv[2]
+        args = " ".join(sys.argv[3:]) if len(sys.argv) > 3 else ""
+        print(mcp_call(tool, args))
+        return
+
+    # Modo conversación
+    pregunta = " ".join(sys.argv[1:])
+    print("🤔 Pensando...", end=" ", flush=True)
+    resp = chat(pregunta, history)
+    if resp:
+        print(f"\n🤖 {resp}")
+        history.append({"q": pregunta, "a": resp, "t": time.time()})
+        save_memory(history)
+    else:
+        # Fallback: muestra estado del sistema
+        print("\n⚠️ IA no responde. Estado actual:")
+        print(get_status())
+
+if __name__ == "__main__":
+    main()

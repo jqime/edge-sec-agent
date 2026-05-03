@@ -1,0 +1,8 @@
+#!/bin/bash
+echo "=== Hardening básico ==="
+echo "1. Deshabilitar IPv6? (si no lo usas):"
+sysctl -w net.ipv6.conf.all.disable_ipv6=1 2>/dev/null || echo "IPv6 ya deshabilitado o no soportado"
+echo "2. Limitar intentos SSH:"
+grep "^MaxAuthTries" /etc/ssh/sshd_config || echo "MaxAuthTries no está configurado (por defecto 6)"
+echo "3. Comprobar puertos abiertos:"
+ss -tlnp | grep LISTEN

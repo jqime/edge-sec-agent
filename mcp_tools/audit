@@ -1,0 +1,6 @@
+#!/bin/bash
+echo "=== Auditoría de seguridad ==="
+echo "Fallos SSH: $(lastb 2>/dev/null | wc -l)"
+echo "Usuarios con sudo: $(grep -E 'sudo|wheel' /etc/group | cut -d: -f4)"
+echo "Servicios expuestos: $(ss -tlnp | awk 'NR>1{print $4}' | cut -d: -f2 | sort -u | tr '\n' ' ')"
+echo "Paquetes desactualizados: $(apt list --upgradable 2>/dev/null | grep -c upgradable || echo 0)"

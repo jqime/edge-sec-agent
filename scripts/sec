@@ -1,0 +1,10 @@
+#!/bin/bash
+case "$1" in
+  red|net|dispositivos)   arp -a 2>/dev/null || ip neigh ;;
+  puertos|ports)         ss -tlnp ;;
+  procesos|ps)           ps aux --sort=-%cpu | head -10 ;;
+  ram|mem)               free -h ;;
+  temp|temperatura)      t=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null); echo "$(echo "scale=1; $t/1000" | bc)C" ;;
+  status)                ip=$(hostname -I | cut -d' ' -f1); ram=$(free -h | awk '/Mem/{print $3"/"$2}'); t=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null); tc=$(echo "scale=1; $t/1000" | bc); fail=$(lastb 2>/dev/null | wc -l); echo "$ip | RAM $ram | Temp ${tc}C | Fallos SSH: $fail" ;;
+  help|*)                echo "Uso: sec {red|puertos|procesos|ram|temp|status}" ;;
+esac

@@ -1,43 +1,6 @@
-# Python
 __pycache__/
-*.py[cod]
-*.pyo
-*.egg-info/
-.eggs/
-dist/
-build/
-*.whl
-
-# Entornos virtuales
-.venv/
-venv/
-env/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
+*.pyc
 *.log
-logs/
-
-# Secretos y configuración local
+memory.json
 .env
-.env.local
-secrets/
-config/local.yaml
-
-# Ollama (modelos descargados — no versionar)
-models/
-*.gguf
-*.bin
-
-# Datos temporales del agente
-data/
-tmp/
+.DS_Store
