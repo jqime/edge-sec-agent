@@ -79,7 +79,7 @@ escanear puertos localhost – escanea puertos abiertos con nmap
 
 bloquear ip 192.168.1.100 – bloquea una IP mediante iptables
 
-🛠️ Herramientas MCP (sec-chat --tool)
+Herramientas MCP (sec-chat --tool)
 Herramienta	Función
 harden	Hardening básico (IPv6, MaxAuthTries, puertos abiertos)
 audit	Auditoría de seguridad (fallos SSH, sudo, servicios expuestos)
