@@ -1,48 +1,26 @@
 #!/usr/bin/env python3
-"""
-source ~/mcp_tools/logger 2>/dev/null || true
-Edge Sec Agent - Módulo de chat y planificación
-Versión mejorada con variables de entorno, reglas avanzadas,
-IA configurable (ollama run + fallback) y manejo robusto de errores.
-"""
+import subprocess, sys, json, os, time, urllib.request, re
 
-import subprocess
-import sys
-import json
-import os
-import time
-import urllib.request
-import re
-
-# ========== CONFIGURACIÓN CON VARIABLES DE ENTORNO ==========
 MODEL = os.getenv("EDGE_MODEL", "tinyllama:1.1b")
-TIMEOUT_IA = int(os.getenv("EDGE_TIMEOUT", "90"))
-USE_OLLAMA_RUN = os.getenv("EDGE_USE_OLLAMA_RUN", "1").lower() in ("1", "true", "yes")
-
-OLLAMA_URL = "http://localhost:11434/api/generate"
+TIMEOUT_IA = int(os.getenv("EDGE_TIMEOUT", "120"))
 MEMORY_FILE = os.path.expanduser("~/.sec_chat_memory.json")
 MCP_DIR = os.path.expanduser("~/mcp_tools")
 os.makedirs(MCP_DIR, exist_ok=True)
 
-# ========== MEMORIA ==========
 def load_memory():
     if os.path.exists(MEMORY_FILE):
         with open(MEMORY_FILE) as f:
             return json.load(f)
     return []
-
 def save_memory(hist):
     with open(MEMORY_FILE, "w") as f:
         json.dump(hist[-30:], f, indent=2)
 
-# ========== EJECUCIÓN SEGURA ==========
 def run(cmd, timeout=10):
     try:
         r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
-        return (r.stdout.strip() or r.stderr.strip())[:2000]
-    except subprocess.TimeoutExpired:
-        return f"[TIMEOUT] El comando tardó más de {timeout}s"
-    except Exception:
+        return (r.stdout.strip() or r.stderr.strip())[:2000] or "-"
+    except:
         return "[error]"
 
 def get_status():
@@ -54,12 +32,9 @@ def get_status():
     fail = run("lastb 2>/dev/null | wc -l")
     return f"IP {ip} | RAM {ram} | Temp {temp} | Puertos {ports} | Fallos SSH {fail}"
 
-# ========== PLANIFICADOR POR REGLAS (MEJORADO) ==========
 def plan_by_rules(desc):
     d = desc.lower()
     steps = []
-
-    # Reglas existentes
     if "docker" in d:
         if "instala" in d or "install" in d:
             steps.append("apt update && apt install -y docker.io && systemctl enable --now docker")
@@ -86,53 +61,30 @@ def plan_by_rules(desc):
         steps.append("fail2ban-client status")
     if "actualizar" in d or "update" in d:
         steps.append("apt update && apt list --upgradable")
-
-    # REGLAS AVANZADAS (nuevas)
+    # NUEVAS REGLAS AVANZADAS
     if "bloquear ip" in d:
         ip_match = re.search(r"bloquear ip\s+([\d\.]+)", d)
         if ip_match:
             ip = ip_match.group(1)
-            steps.append(f"iptables -A INPUT -s {ip} -j DROP && iptables-save > /etc/iptables/rules.v4")
+            steps.append(f"iptables -A INPUT -s {ip} -j DROP")
     if "escanear puertos" in d:
         target = d.split("escanear puertos")[-1].strip() or "localhost"
-        steps.append(f"nmap -sS -O {target} 2>/dev/null | grep -E 'open|closed'")
+        steps.append(f"nmap -p- --min-rate 1000 {target} 2>/dev/null | grep open | head -10")
     if "procesos" in d or "cpu" in d:
         steps.append("ps aux --sort=-%cpu | head -10")
-
     return steps if steps else None
 
-# ========== IA CONVERSACIONAL (VERSIÓN MEJORADA) ==========
-def ask_ollama_via_urllib(prompt):
+def ask_ollama(prompt):
     full = f"Datos del sistema: {get_status()}\n\nUsuario: {prompt}\nAgente:"
-    data = json.dumps({
-        "model": MODEL,
-        "prompt": full,
-        "stream": False,
-        "options": {"num_predict": 200, "temperature": 0.3}
-    }).encode()
-    req = urllib.request.Request(OLLAMA_URL, data=data, headers={"Content-Type": "application/json"})
+    data = json.dumps({"model": MODEL, "prompt": full, "stream": False,
+                       "options": {"num_predict": 200, "temperature": 0.3}}).encode()
+    req = urllib.request.Request("http://localhost:11434/api/generate", data=data,
+                                 headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT_IA) as resp:
             return json.loads(resp.read()).get("response", "")
-    except Exception:
+    except:
         return None
-
-def ask_ollama_via_cli(prompt):
-    full = f"Datos del sistema: {get_status()}\n\nUsuario: {prompt}\nAgente:"
-    cmd = ["ollama", "run", MODEL]
-    try:
-        # Nota: ollama run no acepta --prompt, pasamos el prompt como argumento final
-        result = subprocess.run(cmd + [full], capture_output=True, text=True, timeout=TIMEOUT_IA)
-        return result.stdout.strip() if result.returncode == 0 else None
-    except Exception:
-        return None
-
-def ask_ollama(prompt):
-    if USE_OLLAMA_RUN:
-        resp = ask_ollama_via_cli(prompt)
-        if resp:
-            return resp
-    return ask_ollama_via_urllib(prompt)
 
 def chat(pregunta, history):
     ctx = ""
@@ -140,7 +92,6 @@ def chat(pregunta, history):
         ctx += f"Usuario: {h['q']}\nAgente: {h['a']}\n"
     return ask_ollama(ctx + pregunta)
 
-# ========== MCP ==========
 def mcp_call(tool, args):
     path = os.path.join(MCP_DIR, tool)
     if not os.path.exists(path):
@@ -149,44 +100,32 @@ def mcp_call(tool, args):
         os.chmod(path, 0o755)
     return run(f"{path} {args}", timeout=30)
 
-# ========== MAIN ==========
 def main():
     if len(sys.argv) < 2:
-        print("Uso: sec-chat 'pregunta'")
-        print("      sec-chat --plan 'descripción tarea'")
-        print("      sec-chat --tool nombre [args]")
-        print("\nVariables de entorno:")
-        print("  EDGE_MODEL       - Modelo de Ollama (default: tinyllama:1.1b)")
-        print("  EDGE_TIMEOUT     - Timeout en segundos para IA (default: 90)")
-        print("  EDGE_USE_OLLAMA_RUN - Usar 'ollama run' en lugar de API (default: 1)")
+        print("Uso: sec-chat --plan 'tarea' | --tool nombre | 'pregunta'")
         return
-
     history = load_memory()
-
     if sys.argv[1] == "--plan" and len(sys.argv) > 2:
         desc = " ".join(sys.argv[2:])
         steps = plan_by_rules(desc)
         if not steps:
-            print("⚠️ No se detectó una tarea común. Prueba con: fail2ban, actualizar, reiniciar docker, firewall, bloquear ip, escanear puertos, etc.")
+            print("⚠️ Tarea no reconocida. Prueba: fallos ssh, estado del firewall, escanear puertos localhost, bloquear ip 1.2.3.4")
             return
-        print("\n📌 Plan generado (ejecución inmediata):")
+        print("\n📌 Plan:")
         for i, s in enumerate(steps, 1):
             print(f"  {i}. {s}")
-        confirm = input("\n¿Ejecutar? (s/n): ").strip().lower()
-        if confirm in ('s', 'si', 'sí', 'y'):
+        if input("¿Ejecutar? (s/n): ").lower() in ('s','si','sí','y'):
             for step in steps:
                 print(f"\n▶️ {step}")
                 print(run(step, timeout=60))
         else:
             print("Cancelado.")
         return
-
     if sys.argv[1] == "--tool" and len(sys.argv) > 2:
         tool = sys.argv[2]
         args = " ".join(sys.argv[3:]) if len(sys.argv) > 3 else ""
         print(mcp_call(tool, args))
         return
-
     pregunta = " ".join(sys.argv[1:])
     print("🤔 Pensando...", end=" ", flush=True)
     resp = chat(pregunta, history)

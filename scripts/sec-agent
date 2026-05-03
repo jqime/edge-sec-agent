@@ -1,10 +1,10 @@
 #!/bin/bash
 PREGUNTA="$*"
 if [ -z "$PREGUNTA" ]; then
-    echo "Uso: sec-agent 'tu consulta'"
+    echo "Uso: sec-agent 'consulta'"
     exit 1
 fi
-if echo "$PREGUNTA" | grep -qiE "red|dispositivos|escanea|scan|puertos|procesos|cpu|memoria|temp|temperatura|fallos|ssh|firewall|ufw|fail2ban|docker|actualizar|update|status|estado|kernel|logs|servicio|reiniciar|start|stop|enable|disable"; then
+if echo "$PREGUNTA" | grep -qiE "red|dispositivos|escanea|puertos|procesos|cpu|memoria|temp|temperatura|fallos|ssh|firewall|ufw|fail2ban|docker|actualizar|update|status|estado|kernel|logs|servicio|reiniciar"; then
     sec-chat --plan "$PREGUNTA"
 else
     ia "$PREGUNTA"
