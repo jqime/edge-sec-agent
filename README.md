@@ -135,3 +135,19 @@ Soporte multi‑modelo configurable
 MIT © Jaime Muñoz
 
 <p align="center"> <sub>Hecho con ❤️ para la comunidad DevSecOps en el borde – sin cloud, sin GPU, sin excusas.</sub> </p> ```
+
+## 🛠️ Herramientas MCP avanzadas
+
+Además de las básicas (`harden`, `audit`, `saludo`), el agente incluye estas herramientas profesionales:
+
+| Herramienta | Función |
+|-------------|---------|
+| `security-score` | Puntuación de seguridad (0-100) |
+| `forensic-snapshot` | Crea una instantánea forense del sistema |
+| `event-correlator` | Correlación de eventos (SSH, conexiones, CPU) |
+| `ir-response` | Respuesta a incidentes (aislar, bloquear puertos) |
+| `custom-report` | Genera informes diarios/semanales |
+| `backup` | Respaldo automático de configuraciones críticas |
+| `vuln-scan` | Escaneo rápido de vulnerabilidades con Lynis |
+
+Ejemplo: `sec-chat --tool security-score`
