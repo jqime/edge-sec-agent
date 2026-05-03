@@ -1,0 +1,21 @@
+#!/bin/bash
+# Edge Sec Agent - Autónomo e inteligente
+# Decide entre reglas rápidas o IA según la consulta
+
+PREGUNTA="$*"
+if [ -z "$PREGUNTA" ]; then
+    echo "Uso: sec-agent 'tu consulta'"
+    echo "Ejemplos:"
+    echo "  sec-agent estado del sistema"
+    echo "  sec-agent ¿cómo puedo mejorar la seguridad?"
+    exit 1
+fi
+
+# Lista de palabras clave para tareas operativas (respuesta instantánea)
+if echo "$PREGUNTA" | grep -qiE "red|dispositivos|escanea|scan|puertos|procesos|cpu|memoria|temp|temperatura|fallos|ssh|firewall|ufw|fail2ban|docker|actualizar|update|status|estado|kernel|logs|servicio|reiniciar|start|stop|enable|disable"; then
+    echo "⚡ Modo rápido (reglas)"
+    sec-chat --plan "$PREGUNTA"
+else
+    echo "🧠 Modo inteligente (IA)"
+    ia "$PREGUNTA"
+fi
