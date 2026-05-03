@@ -1,13 +1,60 @@
 #!/bin/bash
+# Sistema de puntuación de seguridad para Orange Pi Zero 3
+
+set -euo pipefail  # Terminar si hay errores
+
 SCORE=100
-[ $(ufw status 2>/dev/null | grep -c "Status: active") -eq 0 ] && SCORE=$((SCORE-20))
-[ $(systemctl is-active fail2ban 2>/dev/null) != "active" ] && SCORE=$((SCORE-15))
-[ $(grep -c "^PermitRootLogin yes" /etc/ssh/sshd_config 2>/dev/null) -gt 0 ] && SCORE=$((SCORE-25))
-[ $(grep -c "^PasswordAuthentication yes" /etc/ssh/sshd_config 2>/dev/null) -gt 0 ] && SCORE=$((SCORE-15))
-echo "🔐 Puntuación de seguridad: $SCORE/100"
-case $SCORE in
-    100) echo "✅ Excelente";;
-    [8-9][0-9]) echo "👍 Bueno";;
-    [6-7][0-9]) echo "⚠️ Mejorable";;
-    *) echo "🔥 Crítico";;
+ISSUES=()
+
+# Verificar firewall UFW
+if ! command -v ufw &> /dev/null || [ "\$(ufw status 2>/dev/null | grep -c "Status: active")" -eq 0 ]; then
+    SCORE=\$((SCORE-20))
+    ISSUES+=("Firewall desactivado o no instalado")
+fi
+
+# Verificar Fail2ban
+if [ "\$(systemctl is-active fail2ban 2>/dev/null)" != "active" ]; then
+    SCORE=\$((SCORE-15))
+    ISSUES+=("Fail2ban no está activo")
+fi
+
+# Verificar configuración SSH
+if [ -f /etc/ssh/sshd_config ]; then
+    if [ "\$(grep -c "^PermitRootLogin yes" /etc/ssh/sshd_config 2>/dev/null)" -gt 0 ]; then
+        SCORE=\$((SCORE-25))
+        ISSUES+=("SSH permite login root")
+    fi
+    
+    if [ "\$(grep -c "^PasswordAuthentication yes" /etc/ssh/sshd_config 2>/dev/null)" -gt 0 ]; then
+        SCORE=\$((SCORE-15))
+        ISSUES+=("SSH permite autenticación por contraseña")
+    fi
+    
+    if [ "\$(grep -c "Port 22" /etc/ssh/sshd_config 2>/dev/null)" -gt 0 ]; then
+        SCORE=\$((SCORE-10))
+        ISSUES+=("SSH usa puerto por defecto (22)")
+    fi
+fi
+
+# Mostrar resultados
+echo "🔐 Puntuación de seguridad: \$SCORE/100"
+
+case \$SCORE in
+    100) echo "✅ Excelente - Tu sistema está bien protegido";;
+    [8-9][0-9]) echo "👍 Bueno - Hay algunas mejoras menores que puedes aplicar";;
+    [6-7][0-9]) echo "⚠️ Mejorable - Debes corregir varios aspectos de seguridad";;
+    *) echo "🔥 Crítico - Tu sistema tiene vulnerabilidades importantes";;
 esac
+
+# Mostrar problemas detectados
+if [ \${#ISSUES[@]} -gt 0 ]; then
+    echo ""
+    echo "Problemas detectados:"
+    for issue in "\${ISSUES[@]}"; do
+        echo "  • \$issue"
+    done
+fi
+
+# Guardar puntuación para historial
+mkdir -p /root/edge-sec-agent/security 2>/dev/null || true
+echo "$(date +%Y-%m-%d_%H:%M:%S),$SCORE" >> /root/edge-sec-agent/security/score_history.csv 2>/dev/null || true

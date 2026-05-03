@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """
+source ~/mcp_tools/logger 2>/dev/null || true
 Edge Sec Agent - Módulo de chat y planificación
 Versión mejorada con variables de entorno, reglas avanzadas,
 IA configurable (ollama run + fallback) y manejo robusto de errores.

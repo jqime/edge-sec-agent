@@ -1,0 +1,35 @@
+#!/bin/bash
+# Sistema de logging centralizado para Edge Sec Agent
+
+LOG_FILE="/var/log/edge-sec-agent.log"
+MAX_LOG_SIZE=1048576  # 1MB
+BACKUP_COUNT=5
+
+# Crear archivo de log si no existe
+mkdir -p "$(dirname "$LOG_FILE")"
+touch "$LOG_FILE"
+
+# Rotar logs si son demasiado grandes
+if [ -f "$LOG_FILE" ] && [ $(stat -c%s "$LOG_FILE" 2>/dev/null || echo 0) -gt $MAX_LOG_SIZE ]; then
+    for i in $(seq $BACKUP_COUNT -1 1); do
+        [ -f "${LOG_FILE}.${i}" ] && mv "${LOG_FILE}.${i}" "${LOG_FILE}.$((i+1))"
+    done
+    mv "$LOG_FILE" "${LOG_FILE}.1"
+    touch "$LOG_FILE"
+fi
+
+# Función de logging
+log_message() {
+    local level=$1
+    local message=$2
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
+    
+    # También enviar a syslog
+    logger -t "edge-sec-agent" "[$level] $message"
+}
+
+# Si se llama con argumentos, registrar mensaje
+if [ $# -gt 0 ]; then
+    log_message "$1" "${@:2}"
+fi
