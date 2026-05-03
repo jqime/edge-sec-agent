@@ -23,9 +23,11 @@
 
 - 🔍 **Comandos instantáneos** (`sec`) para obtener información del sistema en <1s.
 - 🛡️ **Planificador por reglas** (`sec-chat --plan`) para tareas comunes (firewall, logs, fail2ban, actualizaciones).
-- 🧠 **IA conversacional** (`ia` o `sec-agent`) con modelos locales (qwen2.5:0.5b, tinyllama, etc.)
+- 🧠 **IA conversacional** (`ia` o `sec-agent`) con modelos locales (`qwen2.5:0.5b`, `tinyllama`, etc.)
 - 🛠️ **Herramientas MCP** extensibles (hardening, auditoría, scripts personalizados).
 - 📊 **Monitorización automática** con alertas por Telegram y cron.
+- 🔌 **API REST** para integraciones con otros servicios.
+- 🐳 **OpenWebUI** (opcional) como interfaz web para interactuar con la IA.
 
 ---
 
@@ -36,58 +38,97 @@ git clone https://github.com/jqime/edge-sec-agent.git
 cd edge-sec-agent
 cp scripts/sec scripts/sec-chat scripts/sec-agent scripts/ia /usr/local/bin/
 chmod +x /usr/local/bin/sec /usr/local/bin/sec-chat /usr/local/bin/sec-agent /usr/local/bin/ia
+Requisitos previos: Ollama instalado (curl -fsSL https://ollama.com/install.sh | sh) y al menos un modelo descargado (ollama pull qwen2.5:0.5b).
+
 🔧 Comandos disponibles
 ⚡ sec – información del sistema en <1s
 Comando	Descripción
-sec status	IP, RAM, temperatura, fallos SSH
+sec status	IP, RAM, temperatura, puertos abiertos, fallos SSH
 sec red	Dispositivos en la red local (ARP)
 sec puertos	Puertos en escucha (ss -tlnp)
 sec procesos	Procesos con mayor uso de CPU
 sec temp	Temperatura del procesador
 sec ram	Uso de memoria RAM
-🧠 sec-agent – selector automático (recomendado)
+🧠 sec-agent – selector automático (recomendado para uso general)
 Detecta si la consulta es operativa (usa reglas rápidas) o conversacional (usa IA).
 
 bash
-sec-agent "estado del sistema"        # reglas: <2s
-sec-agent "¿cómo mejorar la seguridad?" # IA: 10-90s
-🤖 ia – IA conversacional directa
+sec-agent "estado del sistema"            # reglas: <2s
+sec-agent "¿cómo mejorar la seguridad?"   # IA: 10-90s
+🤖 ia – IA conversacional directa (rápida con qwen2.5:0.5b)
 bash
 ia "¿qué puertos están abiertos?"
 ia "dame consejos de seguridad para SSH"
-🛠️ sec-chat – planificador y herramientas MCP
+🛠️ sec-chat – planificador por reglas y herramientas MCP
 Modo	Ejemplo	Acción
 --plan	sec-chat --plan "estado del firewall"	Ejecuta tareas comunes (instantáneo)
---tool	sec-chat --tool harden	Ejecuta script MCP
+--tool	sec-chat --tool security-score	Ejecuta script MCP
 (ninguno)	sec-chat "pregunta"	IA conversacional (lento, 60-90s)
-🛠️ Herramientas MCP incluidas
-Script	Función
+Reglas disponibles en --plan
+fallos ssh – muestra intentos de login fallidos (lastb)
+
+estado del firewall – muestra reglas UFW
+
+actualizar paquetes – lista paquetes actualizables
+
+fail2ban status – estado de fail2ban
+
+reiniciar docker – reinicia el servicio Docker
+
+escanear puertos localhost – escanea puertos abiertos con nmap
+
+bloquear ip 192.168.1.100 – bloquea una IP mediante iptables
+
+🛠️ Herramientas MCP (sec-chat --tool)
+Herramienta	Función
 harden	Hardening básico (IPv6, MaxAuthTries, puertos abiertos)
 audit	Auditoría de seguridad (fallos SSH, sudo, servicios expuestos)
 saludo	Ejemplo para crear tus propias herramientas
-Crear tu propia herramienta MCP es tan simple como:
+security-score	Puntuación de seguridad (0-100) basada en firewall, fail2ban, SSH
+forensic-snapshot	Crea una instantánea forense del sistema (procesos, conexiones, logs, archivos recientes)
+event-correlator	Correlación de eventos (fallos SSH, conexiones establecidas, CPU alta)
+ir-response	Respuesta a incidentes: isolate (aisla red), lockdown <puerto> (bloquea puerto), status
+custom-report	Genera informes diarios (daily) o semanales (weekly)
+backup	Respaldo automático de configuraciones críticas (SSH, UFW, fail2ban)
+vuln-scan	Escaneo rápido de vulnerabilidades con Lynis
+Ejemplo: sec-chat --tool security-score
+
+Para crear tu propia herramienta MCP, añade un script ejecutable en ~/mcp_tools/ y ejecútalo con sec-chat --tool nombre.
+
+🔌 API REST
+El agente expone una API REST en el puerto 8765 (servicio systemd sec-api.service activo por defecto).
+
+Endpoint: POST /ask
+
+Ejemplo con curl:
 
 bash
-echo -e '#!/bin/bash\necho "Hola $1"' > ~/mcp_tools/mi_script
-chmod +x ~/mcp_tools/mi_script
-sec-chat --tool mi_script "mundo"
+curl -X POST http://localhost:8765/ask \
+  -H "Content-Type: application/json" \
+  -d '{"pregunta": "status"}'
+Respuesta:
+
+json
+{"respuesta": "IP 192.168.1.141 | RAM 1.9Gi/3.8Gi | Temp 34.1C | Puertos 22 3000 8765 ... | Fallos SSH 2"}
+Puedes preguntar cualquier cosa que entendería sec-agent (estado, red, puertos, etc.).
+
 🐳 Contenedor opcional: OpenWebUI
-Despliega una interfaz web para chatear con tus modelos de Ollama:
+Si tienes Docker, despliega una interfaz web para chatear con tus modelos de Ollama:
 
 bash
 docker run -d --name openwebui --add-host host.docker.internal:host-gateway -p 3000:8080 --restart unless-stopped ghcr.io/open-webui/open-webui:main
-Accede en http://tu-ip:3000
+Accede en http://192.168.1.141:3000 (sustituye por tu IP).
 
-📊 Monitorización automática
-El agente instala un cron que:
+📊 Monitorización automática (cron)
+El agente instala automáticamente un cron (durante la instalación) que:
 
-Cada 10 minutos comprueba fallos SSH >5 y envía alerta a Telegram.
+Cada 10 minutos comprueba si hay más de 5 fallos SSH y envía alerta a Telegram.
 
-Cada 5 minutos verifica la temperatura; si supera 60°C, lanza alerta.
+Cada 5 minutos verifica la temperatura; si supera 60 °C, lanza alerta.
 
-Cada hora envía el estado completo del sistema.
+Cada hora envía el estado completo del sistema por Telegram.
 
-Puedes revisar las alertas con:
+Para revisar las alertas:
 
 bash
 grep "sec" /var/log/syslog
@@ -99,16 +140,16 @@ sec-agent (operativo)	< 2 segundos
 Herramienta MCP	< 2 segundos
 ia (modelo rápido qwen2.5:0.5b)	10‑20 segundos
 ia (modelo calidad qwen2.5:3b)	60‑90 segundos
-La IA es lenta por el hardware (4 núcleos ARM, sin GPU). Para el día a día, usa los comandos rápidos – son más que suficientes para tareas de administración y seguridad.
+La IA es lenta debido al hardware (4 núcleos ARM, sin GPU). Para el día a día, usa los comandos rápidos (sec, sec-chat --plan) – son más que suficientes para tareas de administración y seguridad.
 
 🔒 Seguridad
 Todo el código y los modelos se ejecutan localmente (sin envío de datos a la nube).
 
-Los comandos peligrosos (rm, dd, etc.) están bloqueados en el planificador.
+Los comandos peligrosos (rm, dd, mkfs, etc.) están bloqueados en el planificador.
 
 Las herramientas MCP se ejecutan con los permisos del usuario, no como root.
 
-El acceso SSH está protegido por fail2ban (recomendado).
+El acceso SSH está protegido por fail2ban (recomendado) y se puede cambiar el puerto por defecto.
 
 🗺️ Roadmap
 Comandos rápidos (sec)
@@ -127,27 +168,11 @@ Selector automático (sec-agent)
 
 IA conversacional directa (ia)
 
-Modo demonio con alertas personalizables
+Modo demonio con alertas personalizables (opcional, sec-daemon)
 
-Soporte multi‑modelo configurable
+Soporte multi‑modelo configurable (vía EDGE_MODEL)
 
 📄 Licencia
 MIT © Jaime Muñoz
 
 <p align="center"> <sub>Hecho con ❤️ para la comunidad DevSecOps en el borde – sin cloud, sin GPU, sin excusas.</sub> </p> ```
-
-## 🛠️ Herramientas MCP avanzadas
-
-Además de las básicas (`harden`, `audit`, `saludo`), el agente incluye estas herramientas profesionales:
-
-| Herramienta | Función |
-|-------------|---------|
-| `security-score` | Puntuación de seguridad (0-100) |
-| `forensic-snapshot` | Crea una instantánea forense del sistema |
-| `event-correlator` | Correlación de eventos (SSH, conexiones, CPU) |
-| `ir-response` | Respuesta a incidentes (aislar, bloquear puertos) |
-| `custom-report` | Genera informes diarios/semanales |
-| `backup` | Respaldo automático de configuraciones críticas |
-| `vuln-scan` | Escaneo rápido de vulnerabilidades con Lynis |
-
-Ejemplo: `sec-chat --tool security-score`
