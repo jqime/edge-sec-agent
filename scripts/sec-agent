@@ -1,16 +1,16 @@
 #!/bin/bash
-PREGUNTA="$*"
-if [ -z "$PREGUNTA" ]; then
-    echo "Uso: sec-agent 'consulta'"
-    exit 1
+set -euo pipefail
+AGENT_PY="/root/edge-sec-agent/src/agent.py"
+if [[ "$*" =~ (^|[[:space:]])(--security|--json|--html)([[:space:]]|$) ]]; then
+    exec python3 "$AGENT_PY" "$@"
 fi
-if echo "$PREGUNTA" | grep -qiE "red|dispositivos|escanea|puertos|procesos|cpu|memoria|temp|temperatura|fallos|ssh|firewall|ufw|fail2ban|docker|actualizar|update|status|estado|kernel|logs|servicio|reiniciar|security"; then
-    # Nueva ruta: si se solicita seguridad, delegar a la verificación detallada
-    if echo "$PREGUNTA" | grep -qiE "security|seguridad"; then
-        python3 /root/edge-sec-agent/src/agent.py --security
-    else
-        sec-chat --plan "$PREGUNTA"
-    fi
-else
-    ia "$PREGUNTA"
-fi
+LOW=$(echo "$*" | tr '[:upper:]' '[:lower:]')
+case "$LOW" in
+    *red*|*dispositivos*|*arp*)            exec /usr/local/bin/sec red ;;
+    *puertos*|*ports*)                     exec /usr/local/bin/sec puertos ;;
+    *ram*|*memoria*)                       exec /usr/local/bin/sec ram ;;
+    *temp*|*temperatura*)                  exec /usr/local/bin/sec temp ;;
+    *status*|*estado*|*kernel*|*logs*|*servicio*|*reiniciar*|*firewall*|*fail2ban*|*docker*|*actualizar*|*update*)
+                                           exec /usr/local/bin/sec status ;;
+    *)                                     exec python3 "$AGENT_PY" "$@" ;;
+esac
