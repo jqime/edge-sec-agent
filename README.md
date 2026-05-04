@@ -196,6 +196,56 @@ Respuesta:
 
 ---
 
+## Generación de informes de seguridad
+
+- Uso del comando `sec-agent --security`:
+  - Ejecuta cmd_security para generar el informe de seguridad y guardarlo en REPORTS_DIR (por defecto /root/edge-sec-agent/reports). Si se invoca con `--json`, imprime la salida en formato JSON y no genera el informe en texto ni guarda el archivo.
+- Explicación de la puntuación (qué factores se evalúan y cómo se ponderan):
+  - Fallos SSH: cuenta de intentos fallidos a partir de los logs SSH. Contribuye hasta 60 puntos de penalización.
+  - Puertos abiertos: cuentan puertos en escucha que no están en la lista permitida (22, 80, 443, 25, 53). Cada puerto fuera de la lista penaliza hasta 40 puntos.
+  - Temperatura CPU: si la temperatura supera 55C, añade penalización (hasta 25 puntos).
+  - RAM usada: si el uso supera 60%, añade penalización (hasta 25 puntos).
+  - Puntuación final = 100 - int(penalizaciones). Resultado entre 0 y 100.
+- Dónde se guardan los informes y cómo personalizar la ruta (variable `REPORTS_DIR`):
+  - Informe guardado en REPORTS_DIR, por defecto /root/edge-sec-agent/reports.
+  - Puedes configurar la ruta creando la variable de entorno REPORTS_DIR (por ejemplo en /etc/edge-sec-agent/sec-report.env o en tu entorno de servicio).
+- Ejemplo de salida:
+  - Texto:
+  ```text
+  Informe de Seguridad - Puntuación: 78/100
+  Riesgos detectados:
+  - SSH: fallos observados = 3
+  - Puertos abiertos: 22, 80, 9999
+  - Temperatura CPU: 55.3C
+  - RAM usado: 68.4%
+  Recomendaciones específicas:
+    - SSH: usar autenticación por clave, deshabilitar root y login por contraseña, activar fail2ban o similares.
+    - Puertos abiertos: cerrar servicios no esenciales, usar firewall para limitar acceso.
+    - RAM alta utilización: optimizar procesos, considerar swap/zram, revisar fuga de memoria.
+  Informe guardado en: /root/edge-sec-agent/reports/security_20240504-123456.txt
+  ```
+  - JSON con `--json` (la ruta de informe no se genera en este modo, report_path = null):
+  ```json
+  {"score":78,"ssh_failures":3,"open_ports":["22","80","9999"],"temp_c":55.3,"ram_percent":68.4,"report_path":null}
+  ```
+- Automatización (cron o systemd timer):
+  - Systemd (recomendado): usar sec-report.service y sec-report.timer creados en pasos anteriores.
+    - comandos:
+    ```bash
+    sudo systemctl daemon-reload
+    sudo systemctl enable sec-report.timer
+    sudo systemctl start sec-report.timer
+    sudo systemctl status sec-report.timer
+    ```
+  - Cron (alternativa):
+    ```bash
+    0 */12 * * * /usr/local/bin/report-cron.sh
+    ```
+    Este script genera el informe y, si está configurado, envía el correo y registra en /var/log/edge-sec-report.log.
+- Notas:
+  - Si ALERT_EMAIL no está configurado, no se enviarán correos.
+  - REPORTS_DIR es configurable a través de la variable de entorno; si se cambia, el script lo respeta y crea el directorio si no existe.
+
 ## Monitorización automática
 
 El agente instala tareas cron que ejecutan automáticamente:
