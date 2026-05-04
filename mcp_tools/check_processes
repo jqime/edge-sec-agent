@@ -1,23 +1,19 @@
-#!/bin/bash
+﻿#!/bin/bash
 set -euo pipefail
 echo "Top 10 procesos por CPU"
 ps -eo pid,ppid,pcpu,pmem,comm --sort=-pcpu | head -n 10
-echo
-echo "Top 5 memoria hogs"
+echo; echo "Top 5 memoria hogs"
 ps -eo pid,ppid,pmem,pcpu,comm --sort=-pmem | head -n 5
 
-CPU_MAX=50
-RAM_MAX=30
+CPU_MAX=50; RAM_MAX=30
 TOP=$(ps -eo pid,pcpu,pmem,comm --sort=-pcpu | head -n 1)
 CPU_CUR=$(echo "$TOP" | awk '{print $2+0}')
 RAM_CUR=$(echo "$TOP" | awk '{print $3+0}')
-ALERT=0
-MSG=""
+ALERT=0; MSG=""
 if [ -n "$CPU_CUR" ] && [ "$CPU_CUR" -gt "$CPU_MAX" ]; then ALERT=1; MSG+=" CPU:${CPU_CUR}%"; fi
 if [ -n "$RAM_CUR" ] && [ "$RAM_CUR" -gt "$RAM_MAX" ]; then ALERT=1; MSG+=" RAM:${RAM_CUR}%"; fi
-if [ "$ALERT" -eq 1 ]; then
-  MSG_CONCAT="ALERTA: procesos altos:${MSG}"
-  if command -v /usr/local/bin/telegram-notify.sh >/dev/null 2>&1; then
-    /usr/local/bin/telegram-notify.sh "$MSG_CONCAT" 2>/dev/null || true
-  fi
+if [ $ALERT -eq 1 ]; then
+    if command -v /usr/local/bin/telegram-notify.sh >/dev/null; then
+        /usr/local/bin/telegram-notify.sh "ALERTA: procesos altos:${MSG}" 2>/dev/null || true
+    fi
 fi

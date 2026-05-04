@@ -1,6 +1,10 @@
-#!/bin/bash
+﻿#!/bin/bash
 set -euo pipefail
-RAM_TOTAL=$(grep MemTotal /proc/meminfo | awk '{print $2}')
-RAM_AVAIL=$(grep MemAvailable /proc/meminfo | awk '{print $2}')
-RAM_USED_PCT=$(awk "BEGIN{printf \"%.2f\", (1 - $RAM_AVAIL/$RAM_TOTAL) * 100}")
-echo "RAM usado: ${RAM_USED_PCT}%"
+RAM_USED=$(grep MemAvailable /proc/meminfo | awk '{print $2}' | head -n1)
+RAM_TOTAL=$(grep MemTotal /proc/meminfo | awk '{print $2}' | head -n1)
+if [ -n "$RAM_TOTAL" ] && [ -n "$RAM_USED" ]; then
+    RAM_PCT=$(awk "BEGIN{printf \"%.2f\", (1 - $RAM_USED/$RAM_TOTAL) * 100}")
+    echo "RAM usado: ${RAM_PCT}%"
+else
+    echo "RAM: No se pudo obtener"
+fi
