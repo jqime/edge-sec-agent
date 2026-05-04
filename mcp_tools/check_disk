@@ -1,0 +1,41 @@
+﻿#!/bin/bash
+# mcp_tools/check_disk
+# Descripción: Mide el uso de disco en / y /home y envía alerta Telegram si alguno >= 80%.
+# Lectura de configuración desde /root/edge-sec-agent/secrets.env
+
+set -euo pipefail
+
+ROOT_DIR="/root/edge-sec-agent"
+SECRETS="$ROOT_DIR/secrets.env"
+
+if [ -f "$SECRETS" ]; then
+  source "$SECRETS" >/dev/null 2>&1 || true
+fi
+
+parse_percent() {
+  echo "$1" | tr -d '%' | tr -d ' '
+}
+
+ROOT_USAGE=$(df -P / | awk 'NR==2 {print $5}' 2>/dev/null || echo "")
+HOME_USAGE=0
+if [ -d "/home" ]; then
+  HOME_USAGE=$(df -P /home | awk 'NR==2 {print $5}' 2>/dev/null || echo "")
+fi
+
+ROOT_USAGE_N=$(parse_percent "$ROOT_USAGE")
+HOME_USAGE_N=$(parse_percent "$HOME_USAGE")
+
+echo "Root /: ${ROOT_USAGE_N:-0}%, /home: ${HOME_USAGE_N:-0}%"
+
+ALERT_ROOT="${ROOT_USAGE_N:-0}"
+ALERT_HOME="${HOME_USAGE_N:-0}"
+if [ "$ALERT_ROOT" -ge 80 ] || [ "$ALERT_HOME" -ge 80 ]; then
+  MSG="ALERTA: Alto uso de disco. Raíz /: ${ALERT_ROOT}%, /home: ${ALERT_HOME}%."
+  if command -v /usr/local/bin/telegram-notify.sh >/dev/null 2>&1; then
+    /usr/local/bin/telegram-notify.sh "$MSG" 2>/dev/null || true
+  else
+    echo "[WARN] telegram-notify.sh no disponible; no se envía alerta Telegram." >&2
+  fi
+fi
+
+exit 0
