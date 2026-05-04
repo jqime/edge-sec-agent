@@ -1,0 +1,15 @@
+#!/bin/bash
+SSH_LOG="${SSH_LOG_PATH:-/var/log/auth.log}"
+if [ ! -r "$SSH_LOG" ]; then
+    echo "No se puede leer $SSH_LOG (no existe o sin permisos)"
+    echo "Total failed SSH attempts: 0"
+    echo "Top 5 IPs by failures:"
+    exit 0
+fi
+tmpfile=$(mktemp)
+tail -n 1000 "$SSH_LOG" | grep -Ei 'Failed password|authentication failure' > "$tmpfile"
+total=$(wc -l < "$tmpfile")
+echo "Total failed SSH attempts: $total"
+echo "Top 5 IPs by failures:"
+grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' "$tmpfile" | sort | uniq -c | sort -nr | head -5 | awk '{printf "IP: %-15s Fallos: %s\n", $2, $1}'
+rm -f "$tmpfile"

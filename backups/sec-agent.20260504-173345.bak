@@ -1,0 +1,43 @@
+#!/bin/bash
+# sec-agent
+# Wrapper CLI que pasa todos los argumentos a Python, y deriva a sec/ia cuando corresponde.
+
+set -euo pipefail
+
+AGENT_PY="/root/edge-sec-agent/src/agent.py"
+
+PREGUNTA="$*"
+
+if [ -z "$PREGUNTA" ]; then
+  echo "Uso: sec-agent 'consulta'"
+  exit 1
+fi
+
+LOW=$(echo "$PREGUNTA" | tr '[:upper:]' '[:lower:]')
+
+# 1) Pasar todos los argumentos al Python si hay --security o --json
+if echo "$PREGUNTA" | grep -qiE "--security|--json"; then
+  python3 "$AGENT_PY" "$@"
+  exit $?
+fi
+
+# 2) Si no hay --security ni --json, derivar a 'sec' o 'ia' según palabras clave
+if echo "$LOW" | grep -qiE "(red|dispositivos|arp|arp -a)"; then
+  /usr/local/bin/sec red
+  exit $?
+elif echo "$LOW" | grep -qiE "(puertos|ports)"; then
+  /usr/local/bin/sec puertos
+  exit $?
+elif echo "$LOW" | grep -qiE "(ram|memoria)"; then
+  /usr/local/bin/sec ram
+  exit $?
+elif echo "$LOW" | grep -qiE "(temp|temperatura)"; then
+  /usr/local/bin/sec temp
+  exit $?
+elif echo "$LOW" | grep -qiE "(status|estado|kernel|logs|servicio|reiniciar|firewall|fail2ban|docker|actualizar|update)"; then
+  /usr/local/bin/sec status
+  exit $?
+else
+  python3 "$AGENT_PY" "$@"
+  exit $?
+fi
