@@ -2,6 +2,8 @@
 set -euo pipefail
 OUT=$(apt list --upgradable 2>/dev/null | tail -n +2 | head -n 100 || true)
 echo "$OUT"
-if [ -n "$OUT" ] && command -v /usr/local/bin/telegram-notify.sh >/dev/null 2>&1; then
+if command -v /usr/local/bin/telegram-notify.sh >/dev/null 2>&1; then
+  if [ -n "$OUT" ]; then
     /usr/local/bin/telegram-notify.sh "UPDATES:\n$OUT" 2>/dev/null || true
+  fi
 fi
