@@ -5,3 +5,13 @@ memory.json
 .env
 .DS_Store
 memory.db
+
+# Bases de datos y logs locales
+memory.db
+*.log
+reports/
+__pycache__/
+*.pyc
+*.deb
+dropbear
+sec-api.service
