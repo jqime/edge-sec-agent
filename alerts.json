@@ -1,0 +1,12 @@
+{
+  "telegram": {"enabled": true, "bot_token": "TU_TOKEN", "chat_id": "TU_CHAT_ID"},
+  "discord": {"enabled": false, "webhook_url": ""},
+  "email": {"enabled": false, "smtp_server": "", "smtp_port": 587, "username": "", "password": "", "to": ""},
+  "triggers": {
+    "score_min": 70,
+    "cpu_load_5m_max": 2.0,
+    "ram_percent_max": 80,
+    "disk_root_max": 80,
+    "connections_max": 100
+  }
+}

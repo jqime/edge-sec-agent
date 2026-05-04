@@ -1,0 +1,18 @@
+#!/bin/bash
+set -euo pipefail
+echo "Top 10 procesos por CPU"
+ps -eo pid,ppid,pcpu,pmem,comm --sort=-pcpu | head -n 10
+echo
+echo "Top 5 memoria hogs"
+ps -eo pid,ppid,pmem,pcpu,comm --sort=-pmem | head -n 5
+
+CPU_MAX=50
+RAM_MAX=30
+TOP=$(ps -eo pid,pcpu,pmem,comm --sort=-pcpu | head -n 1)
+CPU_CUR=$(echo "$TOP" | awk '{print $2+0}')
+RAM_CUR=$(echo "$TOP" | awk '{print $3+0}')
+
+if (( $(echo "$CPU_CUR > $CPU_MAX" | bc -l) )) || (( $(echo "$RAM_CUR > $RAM_MAX" | bc -l) )); then
+    MSG="ALERTA: CPU ${CPU_CUR}% RAM ${RAM_CUR}%"
+    command -v /usr/local/bin/telegram-notify.sh >/dev/null 2>&1 && /usr/local/bin/telegram-notify.sh "$MSG" 2>/dev/null || true
+fi

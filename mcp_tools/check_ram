@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euo pipefail
+RAM_TOTAL=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+RAM_AVAIL=$(grep MemAvailable /proc/meminfo | awk '{print $2}')
+RAM_USED_PCT=$(awk "BEGIN{printf \"%.2f\", (1 - $RAM_AVAIL/$RAM_TOTAL) * 100}")
+echo "RAM usado: ${RAM_USED_PCT}%"

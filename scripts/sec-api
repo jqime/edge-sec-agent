@@ -3,16 +3,66 @@ import subprocess, json
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        # Endpoint que OpenCode necesita para listar modelos
+        if self.path == "/v1/models":
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "object": "list",
+                "data": [{"id": "sec-agent", "object": "model"}]
+            }).encode())
+            return
+        # Respuesta amigable para verificaciones de salud
+        if self.path in ("/health", "/v1/global/health", "/"):
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"OK")
+            return
+        else:
+            self.send_error(404)
+
     def do_POST(self):
         length = int(self.headers.get('Content-Length', 0))
-        data = json.loads(self.rfile.read(length))
-        pregunta = data.get('pregunta', '')
-        result = subprocess.run(['sec-agent', pregunta], capture_output=True, text=True)
-        respuesta = result.stdout.strip()
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.end_headers()
-        self.wfile.write(json.dumps({'respuesta': respuesta}).encode())
+        body = self.rfile.read(length)
+        data = json.loads(body)
+        path = self.path
+
+        # ---- Soporte para OpenAI (OpenCode) ----
+        if path == "/v1/chat/completions":
+            messages = data.get('messages', [])
+            pregunta = ""
+            for m in messages:
+                if m.get('role') == 'user':
+                    pregunta = m.get('content', '')
+                    break
+            if not pregunta:
+                pregunta = "estado"
+            result = subprocess.run(['sec-agent', pregunta], capture_output=True, text=True)
+            respuesta = result.stdout.strip()
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "choices": [{"message": {"role": "assistant", "content": respuesta}}]
+            }).encode())
+            return
+
+        # ---- Compatibilidad con tu formato anterior (/ask) ----
+        if path == "/ask":
+            pregunta = data.get('pregunta', '')
+            result = subprocess.run(['sec-agent', pregunta], capture_output=True, text=True)
+            respuesta = result.stdout.strip()
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({'respuesta': respuesta}).encode())
+            return
+
+        # ---- Cualquier otra ruta -> 404 ----
+        self.send_error(404)
 
 if __name__ == '__main__':
     HTTPServer(('0.0.0.0', 8765), Handler).serve_forever()
