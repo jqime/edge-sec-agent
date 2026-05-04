@@ -1,0 +1,64 @@
+﻿#!/bin/bash
+# mcp_tools/check_connections.sh
+# Descripción: Muestra las 10 IPs con más conexiones activas y alerta si total > 100.
+# Ubicación: mcp_tools/check_connections.sh
+# Lectura de configuración desde /root/edge-sec-agent/secrets.env
+
+set -euo pipefail
+
+ROOT_DIR="/root/edge-sec-agent"
+SECRETS="$ROOT_DIR/secrets.env"
+
+if [ -f "$SECRETS" ]; then
+  . "$SECRETS" >/dev/null 2>&1 || true
+fi
+
+get_total_connections() {
+  local total=0
+  if command -v ss >/dev/null 2>&1; then
+    total=$(ss -tnH state established 2>/dev/null | wc -l)
+  fi
+  if [ -z "$total" ] || [ "$total" -eq 0 ]; then
+    if command -v netstat >/dev/null 2>&1; then
+      total=$(netstat -tnp 2>/dev/null | awk '/ESTABLISHED/ {print}' | wc -l)
+    fi
+  fi
+  echo "$total"
+}
+
+get_top_ips() {
+  local ips=""
+  if command -v ss >/dev/null 2>&1; then
+    ips=$(ss -tnH state established 2>/dev/null | awk '{split($NF,a,":"); ip=a[1]; if (ip!=""){ print ip } }' | sort | uniq -c | sort -nr | head -n 10)
+  elif command -v netstat >/dev/null 2>&1; then
+    ips=$(netstat -tnp 2>/dev/null | awk '/ESTABLISHED/ {split($5,a,":"); ip=a[1]; if (ip!=""){ print ip } }' | sort | uniq -c | sort -nr | head -n 10)
+  fi
+  echo "$ips"
+}
+
+main() {
+  local total
+  total=$(get_total_connections)
+
+  echo "Conexiones totales: ${total:-0}"
+
+  echo "Top 10 IPs por conexiones (IP - conteo):"
+  local ips
+  ips=$(get_top_ips)
+  if [ -n "$ips" ]; then
+    echo "$ips" | awk '{if($2!=""){ printf "IP: %-15s Conexiones: %s\n", $2, $1 } }'
+  fi
+
+  if [ -n "${total}" ] && [ "${total}" -gt 100 ]; then
+    TOP_IPS=$(echo "$ips" | awk '{print $2}' | head -n 5 | paste -sd ", " -)
+    MSG="ALERTA: Conexiones totales ${total}. Top IPs: ${TOP_IPS}"
+    if command -v /usr/local/bin/telegram-notify.sh >/dev/null 2>&1; then
+      /usr/local/bin/telegram-notify.sh "$MSG" 2>/dev/null || true
+    else
+      echo "[WARN] telegram-notify.sh no disponible; no se envía alerta Telegram." >&2
+    fi
+  fi
+}
+
+main "$@"
+exit 0
