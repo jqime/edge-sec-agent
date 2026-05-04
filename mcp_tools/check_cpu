@@ -1,0 +1,40 @@
+﻿#!/bin/bash
+# mcp_tools/check_cpu
+# Descripción: Muestra carga media (1, 5, 15 min) y uso de CPU por núcleo. 
+#              Envía alerta por Telegram si la carga 5m > 2.0.
+# Lectura de configuración desde /root/edge-sec-agent/secrets.env
+
+set -euo pipefail
+
+ROOT_DIR="/root/edge-sec-agent"
+SECRETS="$ROOT_DIR/secrets.env"
+
+if [ -f "$SECRETS" ]; then
+  . "$SECRETS" >/dev/null 2>&1 || true
+fi
+
+read LOAD1 LOAD5 LOAD15 < <(awk '{print $1" "$2" "$3}' /proc/loadavg)
+
+PER_CORE=$(awk '/^cpu[0-9]+/ { sum=0; for(i=2; i<=NF; i++){ sum += $i }; idle=$4; if(sum>0) printf "%s:%.2f%% ", substr($1,4), (sum-idle)/sum*100 }' /proc/stat | tr -s ' ')
+
+ALERT_FLAG=$(echo "$LOAD5" | awk 'BEGIN{f=0} {if ($1+0.0 > 2.0) f=1} END{exit (f==1)?0:1}')
+
+if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
+  if [ "$ALERT_FLAG" -eq 0 ]; then
+    MSG="ALERTA: Carga media 5m alta (>2.0). 5m=${LOAD5}, Core usages: ${PER_CORE}"
+    if command -v /usr/local/bin/telegram-notify.sh >/dev/null 2>&1; then
+      /usr/local/bin/telegram-notify.sh "$MSG" 2>/dev/null || true
+    else
+      echo "[WARN] telegram-notify.sh no disponible; no se envía alerta Telegram." >&2
+    fi
+  fi
+else
+  echo "[INFO] Telegram notificaciones no configuradas (TOKEN/CHAT_ID ausentes)."
+fi
+
+echo "Load average: 1m=${LOAD1}, 5m=${LOAD5}, 15m=${LOAD15}"
+if [ -n "$PER_CORE" ]; then
+  echo "CPU por núcleo: ${PER_CORE}"
+fi
+
+exit 0
