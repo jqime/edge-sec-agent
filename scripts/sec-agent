@@ -4,8 +4,13 @@ if [ -z "$PREGUNTA" ]; then
     echo "Uso: sec-agent 'consulta'"
     exit 1
 fi
-if echo "$PREGUNTA" | grep -qiE "red|dispositivos|escanea|puertos|procesos|cpu|memoria|temp|temperatura|fallos|ssh|firewall|ufw|fail2ban|docker|actualizar|update|status|estado|kernel|logs|servicio|reiniciar"; then
-    sec-chat --plan "$PREGUNTA"
+if echo "$PREGUNTA" | grep -qiE "red|dispositivos|escanea|puertos|procesos|cpu|memoria|temp|temperatura|fallos|ssh|firewall|ufw|fail2ban|docker|actualizar|update|status|estado|kernel|logs|servicio|reiniciar|security"; then
+    # Nueva ruta: si se solicita seguridad, delegar a la verificación detallada
+    if echo "$PREGUNTA" | grep -qiE "security|seguridad"; then
+        python3 /root/edge-sec-agent/src/agent.py --security
+    else
+        sec-chat --plan "$PREGUNTA"
+    fi
 else
     ia "$PREGUNTA"
 fi
