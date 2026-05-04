@@ -12,6 +12,7 @@ import os
 import urllib.request
 import time
 import hashlib
+from datetime import datetime
 
 # ========== CONFIGURACIÓN ==========
 OLLAMA_URL = "http://localhost:11434/api/generate"
@@ -100,6 +101,135 @@ def get_ctx():
         "net_range": net_range.strip() or "192.168.1.0/24",
     }
 
+# Funcionalidad de seguridad auxiliar (cmd_security)
+def _count_ssh_failures():
+    logs = []
+    paths = ["/var/log/auth.log", "/var/log/auth.log.1", "/var/log/secure", "/var/log/secure.1"]
+    for p in paths:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", errors="ignore") as f:
+                    for line in f:
+                        if "Failed password" in line or "authentication failure" in line.lower():
+                            logs.append(line)
+            except Exception:
+                continue
+    return len(logs)
+
+def _get_open_ports():
+    ports = set()
+    out = run("ss -tlnp 2>/dev/null")
+    if not out or out.strip() == "-":
+        return sorted(list(ports))
+    for line in out.splitlines():
+        if "LISTEN" not in line:
+            continue
+        parts = line.strip().split()
+        if len(parts) >= 4:
+            local = parts[3]
+            if ":" in local:
+                port = local.split(":")[-1]
+                if port.isdigit():
+                    ports.add(int(port))
+    return sorted(list(ports))
+
+def _get_temperature_c():
+    for i in range(0, 10):
+        path = f"/sys/class/thermal/thermal_zone{i}/temp"
+        if os.path.exists(path):
+            try:
+                v = int(open(path).read().strip())
+                return v / 1000.0
+            except Exception:
+                continue
+    return None
+
+def _get_ram_usage_percent():
+    try:
+        with open("/proc/meminfo", "r") as f:
+            total = None
+            avail = None
+            for line in f:
+                if line.startswith("MemTotal:"):
+                    total = int(line.split()[1])
+                if line.startswith("MemAvailable:"):
+                    avail = int(line.split()[1])
+            if total and avail is not None:
+                used = total - avail
+                return (used / total) * 100.0
+    except Exception:
+        pass
+    return None
+
+def _compute_security_score(ssh_failures, open_ports, temp_c, ram_percent):
+    penalties = 0.0
+    penalties += min(ssh_failures * 2.0, 60.0)
+    allowed = {22, 80, 443, 25, 53}
+    risk_open_ports = sum(1 for p in open_ports if p not in allowed)
+    penalties += min(risk_open_ports * 8.0, 40.0)
+    if temp_c is not None and temp_c > 55:
+        penalties += min((temp_c - 55) * 1.5, 25.0)
+    if ram_percent is not None and ram_percent > 60:
+        penalties += min((ram_percent - 60) * 0.8, 25.0)
+    score = max(0, 100 - int(penalties))
+    return score
+
+def _format_security_report(score, ssh_f, open_ports, temp_c, ram_p):
+    lines = []
+    lines.append(f"Informe de Seguridad - Puntuación: {score}/100")
+    lines.append("Riesgos detectados:")
+    lines.append(f"- SSH: fallos observados = {ssh_f}")
+    ports_str = ", ".join(map(str, open_ports)) if open_ports else "ninguno"
+    lines.append(f"- Puertos abiertos: {ports_str}")
+    lines.append(f"- Temperatura CPU: {temp_c:.1f}C" if temp_c is not None else "- Temperatura CPU: desconocida")
+    lines.append(f"- RAM usado: {ram_p:.1f}%" if ram_p is not None else "- RAM usado: desconocido")
+    lines.append("")
+    lines.append("Recomendaciones específicas:")
+    recs = []
+    if ssh_f > 0:
+        recs.append("- SSH: usar autenticación por clave, deshabilitar root y login por contraseña, activar fail2ban o similares.")
+        recs.append("- SSH: considerar cambiar puerto SSH y/o usar 2FA si disponible.")
+    if open_ports:
+        recs.append("- Puertos abiertos: cerrar servicios no esenciales, usar firewall para limitar acceso.")
+        recs.append("- Revisa servicios en puertos no estándar y valida necesidad real.")
+    if temp_c is not None and temp_c > 55:
+        recs.append("- Temperatura alta: mejora refrigeración y revisa procesos que consumen CPU.")
+    if ram_p is not None and ram_p > 60:
+        recs.append("- RAM alta utilización: optimizar procesos, considerar swap/zram, revisar fuga de memoria.")
+    if not recs:
+        recs.append("- El sistema parece estable; mantener monitoreo periódico.")
+    for r in recs:
+        lines.append("  " + r)
+    return "\n".join(lines)
+
+def save_security_report(text):
+    dirp = "/root/edge-sec-agent/reports"
+    os.makedirs(dirp, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    path = f"{dirp}/security_{ts}.txt"
+    with open(path, "w") as f:
+        f.write(text)
+    return path
+
+def cmd_security():
+    ssh_failures = _count_ssh_failures()
+    open_ports = _get_open_ports()
+    temp_c = _get_temperature_c()
+    ram_percent = _get_ram_usage_percent()
+    score = _compute_security_score(ssh_failures, open_ports, temp_c, ram_percent)
+    report_text = _format_security_report(score, ssh_failures, open_ports, temp_c, ram_percent)
+    report_path = save_security_report(report_text)
+    print(report_text)
+    print(f"\nInforme guardado en: {report_path}")
+    return {
+        "score": score,
+        "ssh_failures": ssh_failures,
+        "open_ports": open_ports,
+        "temp_c": temp_c,
+        "ram_percent": ram_percent,
+        "report_path": report_path,
+    }
+
 # ========== LLAMADA A OLLAMA ==========
 def ask_ollama(prompt, model=None, max_tokens=MAX_TOKENS, temp=0.2):
     m = model or MODEL
@@ -183,7 +313,7 @@ def build_prompt(ctx, pregunta, tool_output, historial):
     hist_text = ""
     for h in historial[-5:]:
         hist_text += f"Jaime: {h['q']}\nSec: {h['a']}\n"
-    return f"""Eres Sec, asistente DevSecOps. Responde usando EXCLUSIVAMENTE los datos reales que aparecen abajo. No inventes números ni información.
+    return f"""Eres Sec, asistente DevSecOps. Responde siempre en español y en formato de viñetas. Responde usando EXCLUSIVAMENTE los datos reales que aparecen abajo. No inventes números ni información.
 
 Datos del sistema actual: {sys_info}
 {datos}
@@ -201,6 +331,11 @@ def main():
     mem = load_memory()
     historial = mem.get("history", [])
     args = sys.argv[1:]
+
+    # Comando dedicado de seguridad
+    if "--security" in args:
+        cmd_security()
+        return
 
     # Modo de una sola pregunta
     if args and args[0] not in ("--chat", "--interactive"):
