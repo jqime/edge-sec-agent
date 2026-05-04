@@ -25,3 +25,7 @@ __pycache__/
 *.deb
 dropbear
 sec-api.service
+secrets.env
+data/history.db
+backups/
+src/*.bak*
