@@ -1,18 +1,11 @@
-#!/bin/bash
+﻿#!/bin/bash
 set -euo pipefail
 DB="/root/edge-sec-agent/data/history.db"
-
-if [ ! -f "$DB" ]; then
-  echo "No history available (no history DB at $DB)"
-  exit 0
-fi
-
+[ ! -f "$DB" ] && { echo "No history available"; exit 0; }
 if [ "${1:-}" = "--json" ]; then
-  if command -v sqlite3 >/dev/null 2>&1; then
-    sqlite3 -json "$DB" "SELECT timestamp, score, ssh_failures, open_ports, temp_c, ram_percent FROM history ORDER BY timestamp DESC LIMIT 30;"
-  else
-    echo "sqlite3 no disponible"
-  fi
+    if command -v sqlite3 >/dev/null; then
+        sqlite3 -json "$DB" "SELECT timestamp, score, ssh_failures, open_ports, temp_c, ram_percent FROM history ORDER BY timestamp DESC LIMIT 30;"
+    else echo "sqlite3 no disponible"; fi
 else
-  sqlite3 -header -column "$DB" "SELECT timestamp, score, ssh_failures, open_ports, temp_c, ram_percent FROM history ORDER BY timestamp DESC LIMIT 30;"
+    sqlite3 -header -column "$DB" "SELECT timestamp, score, ssh_failures, open_ports, temp_c, ram_percent FROM history ORDER BY timestamp DESC LIMIT 30;"
 fi

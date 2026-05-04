@@ -1,4 +1,4 @@
-{
+﻿{
   "telegram": {"enabled": true, "bot_token": "TU_TOKEN", "chat_id": "TU_CHAT_ID"},
   "discord": {"enabled": false, "webhook_url": ""},
   "email": {"enabled": false, "smtp_server": "", "smtp_port": 587, "username": "", "password": "", "to": ""},
