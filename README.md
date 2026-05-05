@@ -377,3 +377,8 @@ MIT © [Jaime Muñoz](https://github.com/jqime) — SecDevOps @ CDS Race Experie
 <p align="center">
   <sub>Hecho con ❤️ para la comunidad DevSecOps en el borde — sin cloud, sin GPU, sin excusas.</sub>
 </p>
+
+## 📊 Dashboard web
+
+## 📊 Dashboard web
+Accede al dashboard en tiempo real en: http://192.168.1.141:8080
