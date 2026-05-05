@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 set -euo pipefail
 RAM_USED=$(grep MemAvailable /proc/meminfo | awk '{print $2}' | head -n1)
 RAM_TOTAL=$(grep MemTotal /proc/meminfo | awk '{print $2}' | head -n1)

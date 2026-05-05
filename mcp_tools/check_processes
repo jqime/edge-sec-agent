@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 set -euo pipefail
 echo "Top 10 procesos por CPU"
 ps -eo pid,ppid,pcpu,pmem,comm --sort=-pcpu | head -n 10

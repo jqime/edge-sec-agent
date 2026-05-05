@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 set -euo pipefail
 OUT=$(apt list --upgradable 2>/dev/null | tail -n +2 | head -n 100 || true)
 echo "$OUT"

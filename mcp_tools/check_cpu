@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # mcp_tools/check_cpu
 # Descripción: Muestra carga media (1, 5, 15 min) y uso de CPU por núcleo. 
 #              Envía alerta por Telegram si la carga 5m > 2.0.
