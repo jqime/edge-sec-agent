@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 set -euo pipefail
 DB="/root/edge-sec-agent/data/history.db"
 [ ! -f "$DB" ] && { echo "No history available"; exit 0; }

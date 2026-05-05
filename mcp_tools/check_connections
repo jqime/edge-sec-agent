@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # mcp_tools/check_connections.sh
 # Descripción: Muestra las 10 IPs con más conexiones activas y alerta si total > 100.
 # Ubicación: mcp_tools/check_connections.sh
