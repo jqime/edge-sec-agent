@@ -112,14 +112,24 @@ fi
 echo ""
 
 ###############################################################################
-# 4. VERIFICACIÓN DE PROXY INVERSO — Nginx activo en puerto 8080
+# 4. VERIFICACIÓN DE PROXY INVERSO — Nginx activo en puerto 8443 (HTTPS)
 ###############################################################################
-echo -e "${BOLD}[4/5] Proxy Inverso: Nginx en puerto 8080${NC}"
+echo -e "${BOLD}[4/5] Proxy Inverso: Nginx en puerto 8443 (HTTPS + TLS)${NC}"
 
-if ss -tlnp 2>/dev/null | grep -q ":8080\b"; then
-    print_result "Nginx escuchando en puerto 8080" "pass" "$(ss -tlnp | grep ':8080')"
+if ss -tlnp 2>/dev/null | grep -q ":8443\b"; then
+    print_result "Nginx escuchando en puerto 8443 (SSL)" "pass" "$(ss -tlnp | grep ':8443')"
 else
-    print_result "Nginx escuchando en puerto 8080" "fail" "Nginx no está escuchando en el puerto 8080"
+    print_result "Nginx escuchando en puerto 8443 (SSL)" "fail" "Nginx no está escuchando en el puerto 8443"
+fi
+
+# Verificar que el certificado TLS existe y es válido
+SSL_CERT="/etc/ssl/certs/edge-sec-agent.crt"
+SSL_KEY="/etc/ssl/private/edge-sec-agent.key"
+if [ -f "$SSL_CERT" ] && [ -f "$SSL_KEY" ]; then
+    KEY_PERMS=$(stat -c %a "$SSL_KEY" 2>/dev/null || echo "unknown")
+    print_result "Certificado TLS presente" "pass" "Key permissions: $KEY_PERMS (expected: 600)"
+else
+    print_result "Certificado TLS presente" "fail" "Certificado o clave privada no encontrados"
 fi
 
 if systemctl is-active --quiet nginx 2>/dev/null; then
@@ -131,16 +141,20 @@ fi
 echo ""
 
 ###############################################################################
-# 5. SIMULACIÓN INTERNA DE HEALTH CHECK — Endpoint /v1/global/health
+# 5. SIMULACIÓN INTERNA DE HEALTH CHECK — Endpoint /v1/global/health (HTTPS + Basic Auth)
 ###############################################################################
-echo -e "${BOLD}[5/5] Health Check: Endpoint /v1/global/health${NC}"
+echo -e "${BOLD}[5/5] Health Check: Endpoint /v1/global/health (HTTPS + Auth)${NC}"
 
-HTTP_CODE=$(curl -s -o /tmp/health_response.json -w "%{http_code}" http://127.0.0.1:8080/v1/global/health 2>/dev/null || echo "000")
+HTTP_CODE=$(curl -sk -o /tmp/health_response.json -w "%{http_code}" \
+    -u admin:EdgeSec2026! \
+    https://127.0.0.1:8443/v1/global/health 2>/dev/null || echo "000")
 
 if [ "$HTTP_CODE" = "200" ]; then
-    print_result "HTTP 200 OK" "pass" "Código de respuesta: $HTTP_CODE"
+    print_result "HTTPS 200 OK (con Basic Auth)" "pass" "Código de respuesta: $HTTP_CODE"
+elif [ "$HTTP_CODE" = "401" ]; then
+    print_result "HTTPS Basic Auth activo" "fail" "Endpoint requiere autenticación (401) — credenciales incorrectas o no proporcionadas"
 else
-    print_result "HTTP 200 OK" "fail" "Código de respuesta: $HTTP_CODE (esperado: 200)"
+    print_result "HTTPS 200 OK (con Basic Auth)" "fail" "Código de respuesta: $HTTP_CODE (esperado: 200)"
 fi
 
 HEALTH_STATUS=$(python3 -c "import json; print(json.load(open('/tmp/health_response.json')).get('status',''))" 2>/dev/null || echo "")
@@ -154,6 +168,14 @@ fi
 # Extraer y mostrar temperatura de CPU si está disponible
 CPU_TEMP=$(python3 -c "import json; t=json.load(open('/tmp/health_response.json')).get('hardware',{}).get('cpu_temp_c'); print(f'{t}°C' if t else 'N/A')" 2>/dev/null || echo "N/A")
 echo -e "        ${YELLOW}Temperatura CPU: $CPU_TEMP${NC}"
+
+# Verificar que sin autenticación se recibe 401 (Basic Auth activo)
+NO_AUTH_CODE=$(curl -sk -o /dev/null -w "%{http_code}" https://127.0.0.1:8443/ 2>/dev/null || echo "000")
+if [ "$NO_AUTH_CODE" = "401" ]; then
+    print_result "Basic Auth bloqueando acceso sin credenciales" "pass" "Sin auth → HTTP $NO_AUTH_CODE"
+else
+    print_result "Basic Auth bloqueando acceso sin credenciales" "fail" "Sin auth → HTTP $NO_AUTH_CODE (esperado: 401)"
+fi
 
 # Limpiar archivo temporal
 rm -f /tmp/health_response.json

@@ -27,8 +27,42 @@ fi
 source "$REPO_DIR/venv/bin/activate"
 pip install -q flask gunicorn
 
-# 3. Configurar nginx
-echo "[3/7] Configuring nginx reverse proxy..."
+# 3. Configurar nginx: TLS, Basic Auth, Rate Limiting y Security Headers
+echo "[3/7] Configuring nginx reverse proxy with TLS and security hardening..."
+
+# 3a. Generar certificado TLS auto-firmado (2048 bits, 365 días)
+SSL_CERT="/etc/ssl/certs/edge-sec-agent.crt"
+SSL_KEY="/etc/ssl/private/edge-sec-agent.key"
+
+if [ ! -f "$SSL_CERT" ] || [ ! -f "$SSL_KEY" ]; then
+    echo "    Generating self-signed TLS certificate..."
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        -keyout "$SSL_KEY" \
+        -out "$SSL_CERT" \
+        -subj "/C=ES/ST=Madrid/L=Madrid/O=EdgeSecAgent/CN=192.168.1.141" 2>/dev/null
+    chmod 600 "$SSL_KEY"
+    chmod 644 "$SSL_CERT"
+    echo "    TLS certificate: $SSL_CERT"
+    echo "    TLS private key: $SSL_KEY (permissions: 600)"
+else
+    echo "    TLS certificate already exists — skipping generation"
+fi
+
+# 3b. Crear archivo Basic Auth para Nginx (admin / EdgeSec2026!)
+HTPASSWD_FILE="/etc/nginx/.htpasswd"
+if [ ! -f "$HTPASSWD_FILE" ]; then
+    echo "    Creating Basic Auth credentials..."
+    # Generar hash APR1-MD5 compatible con Nginx
+    HASH=$(openssl passwd -apr1 'EdgeSec2026!' 2>/dev/null)
+    echo "admin:${HASH}" > "$HTPASSWD_FILE"
+    chmod 640 "$HTPASSWD_FILE"
+    chown root:www-data "$HTPASSWD_FILE" 2>/dev/null || true
+    echo "    Basic Auth: admin / EdgeSec2026!"
+else
+    echo "    Basic Auth file already exists — skipping creation"
+fi
+
+# 3c. Instalar configuración de Nginx
 cp "$NGINX_CONF_SRC" "$NGINX_CONF_AVAIL"
 ln -sf "$NGINX_CONF_AVAIL" "$NGINX_CONF_DST"
 
@@ -65,8 +99,8 @@ else
     echo "    Flask app (Gunicorn): UNREACHABLE"
 fi
 
-if curl -sf http://127.0.0.1:8080/ > /dev/null; then
-    echo "    Nginx proxy: HEALTHY (port 8080)"
+if curl -sfk https://127.0.0.1:8443/ > /dev/null; then
+    echo "    Nginx proxy: HEALTHY (port 8443 HTTPS)"
 else
     echo "    Nginx proxy: UNREACHABLE - check nginx config"
 fi
