@@ -1,0 +1,24 @@
+[Unit]
+Description=Edge Sec Agent - Gunicorn WSGI Server
+After=network.target nginx.service
+Wants=nginx.service
+
+[Service]
+Type=notify
+User=root
+Group=root
+WorkingDirectory=/root/edge-sec-agent
+Environment="PATH=/root/edge-sec-agent/venv/bin"
+ExecStart=/root/edge-sec-agent/venv/bin/gunicorn \
+    --bind 127.0.0.1:5000 \
+    --workers 2 \
+    --timeout 120 \
+    --access-logfile /var/log/gunicorn-edge-access.log \
+    --error-logfile /var/log/gunicorn-edge-error.log \
+    wsgi:app
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

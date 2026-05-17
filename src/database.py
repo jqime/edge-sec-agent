@@ -4,7 +4,7 @@ database.py - Módulo de persistencia SQLite para métricas históricas del Edge
 Almacena: timestamp, cpu_usage, ram_usage, cpu_temp, banned_ips.
 """
 import sqlite3, os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 DB_PATH = os.environ.get("EDGE_DB_PATH", "/root/edge-sec-agent/data/edge_metrics.db")
 
@@ -13,6 +13,14 @@ def _get_conn():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+def prune_old_metrics(days=30):
+    cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    conn = _get_conn()
+    deleted = conn.execute("DELETE FROM metrics WHERE timestamp < ?", (cutoff,)).rowcount
+    conn.commit()
+    conn.close()
+    return deleted
 
 def init_db():
     conn = _get_conn()
@@ -28,6 +36,7 @@ def init_db():
     """)
     conn.commit()
     conn.close()
+    prune_old_metrics(days=30)
 
 def insert_metric(cpu_usage=None, ram_usage=None, cpu_temp=None, banned_ips=0):
     conn = _get_conn()
