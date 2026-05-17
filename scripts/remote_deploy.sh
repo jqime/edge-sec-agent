@@ -9,12 +9,12 @@ NGINX_CONF_AVAIL="/etc/nginx/sites-available/edge-sec-agent.conf"
 echo "=== Edge Sec Agent - Remote Deploy ==="
 
 # 1. Actualizar código desde Git
-echo "[1/8] Pulling latest changes from Git..."
+echo "[1/7] Pulling latest changes from Git..."
 cd "$REPO_DIR"
 git pull --rebase --autostash
 
 # 2. Instalar dependencias del sistema
-echo "[2/8] Installing nginx and gunicorn..."
+echo "[2/7] Installing nginx and gunicorn..."
 apt-get update -qq
 apt-get install -y -qq nginx python3-pip python3-venv > /dev/null 2>&1 || true
 
@@ -28,7 +28,7 @@ source "$REPO_DIR/venv/bin/activate"
 pip install -q flask gunicorn
 
 # 3. Configurar nginx
-echo "[3/8] Configuring nginx reverse proxy..."
+echo "[3/7] Configuring nginx reverse proxy..."
 cp "$NGINX_CONF_SRC" "$NGINX_CONF_AVAIL"
 ln -sf "$NGINX_CONF_AVAIL" "$NGINX_CONF_DST"
 
@@ -37,39 +37,32 @@ rm -f /etc/nginx/sites-enabled/default
 
 nginx -t > /dev/null 2>&1 && systemctl reload nginx || systemctl restart nginx
 
-# 4. Detener servidor de desarrollo Flask anterior
-echo "[4/8] Stopping old Flask dev server..."
+# 4. Detener servidor de desarrollo Flask anterior e instalar servicio systemd
+echo "[4/7] Stopping old Flask dev server and installing systemd service..."
 pkill -f "python.*sec_web.py" 2>/dev/null || true
-pkill -f "python.*wsgi.py" 2>/dev/null || true
+pkill -f "gunicorn.*wsgi:app" 2>/dev/null || true
 sleep 1
 
-# 5. Levantar Gunicorn en modo daemon
-echo "[5/8] Starting Gunicorn on 127.0.0.1:5000..."
-cd "$REPO_DIR"
-source "$REPO_DIR/venv/bin/activate"
-gunicorn --daemon \
-    --bind 127.0.0.1:5000 \
-    --workers 2 \
-    --timeout 120 \
-    --access-logfile /var/log/gunicorn-edge-access.log \
-    --error-logfile /var/log/gunicorn-edge-error.log \
-    wsgi:app
-
+# Instalar servicio systemd para Gunicorn
+cp "$REPO_DIR/edge-sec-agent.service" /etc/systemd/system/edge-sec-agent.service
+systemctl daemon-reload
+systemctl enable edge-sec-agent
+systemctl restart edge-sec-agent
 sleep 2
 
-# 6. Verificar servicios
-echo "[6/8] Verifying deployment..."
-if pgrep -x gunicorn > /dev/null; then
-    echo "    Gunicorn: RUNNING (PID: $(pgrep -x gunicorn | head -1))"
+# 5. Verificar Gunicorn via systemd y endpoints
+echo "[5/7] Verifying Gunicorn service and endpoints..."
+if systemctl is-active --quiet edge-sec-agent; then
+    echo "    edge-sec-agent.service: ACTIVE"
 else
-    echo "    Gunicorn: FAILED - check /var/log/gunicorn-edge-error.log"
+    echo "    edge-sec-agent.service: FAILED - check journalctl -u edge-sec-agent"
     exit 1
 fi
 
 if curl -sf http://127.0.0.1:5000/ > /dev/null; then
-    echo "    Flask app: HEALTHY"
+    echo "    Flask app (Gunicorn): HEALTHY"
 else
-    echo "    Flask app: UNREACHABLE"
+    echo "    Flask app (Gunicorn): UNREACHABLE"
 fi
 
 if curl -sf http://127.0.0.1:8080/ > /dev/null; then
@@ -80,8 +73,8 @@ fi
 
 echo "=== Deploy complete ==="
 
-# 7. Hardening Dropbear SSH: forzar puerto 2222 y bloquear 22
-echo "[7/8] Hardening Dropbear SSH..."
+# 6. Hardening Dropbear SSH: forzar puerto 2222 y bloquear 22
+echo "[6/7] Hardening Dropbear SSH..."
 DROPBEAR_CONF="/etc/default/dropbear"
 if [ -f "$DROPBEAR_CONF" ]; then
     # Guardar backup de la configuración original
@@ -115,8 +108,8 @@ else
     echo "    Dropbear config not found at $DROPBEAR_CONF - skipping"
 fi
 
-# 8. Bloquear tráfico entrante residual al puerto 22 con iptables
-echo "[8/8] Blocking residual port 22 traffic with iptables..."
+# 7. Bloquear tráfico entrante residual al puerto 22 con iptables
+echo "[7/7] Blocking residual port 22 traffic with iptables..."
 # No bloquear si la sesión SSH actual usa puerto 22 (evitar lockout)
 CURRENT_SSH_PORT=$(echo "$SSH_CONNECTION" | awk '{print $4}' || echo "")
 if [ "$CURRENT_SSH_PORT" = "22" ]; then
