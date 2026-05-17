@@ -90,6 +90,50 @@ El repositorio incorpora un conjunto de scripts ejecutables dentro del directori
 * `./mcp_tools/check_connections`: Mapea los sockets de red abiertos en interfaces de escucha.
 * `./mcp_tools/show_history`: Extrae resúmenes estadísticos de la base de datos analítica SQLite.
 
+### 5.4. Estructura del Repositorio
+
+```
+edge-sec-agent/
+├── src/
+│   ├── agent.py              # Motor principal de análisis de seguridad
+│   ├── sec_web.py            # Aplicación Flask (endpoints REST)
+│   └── database.py           # Persistencia SQLite + retención automática
+├── mcp_tools/                # Herramientas de diagnóstico ejecutables
+│   ├── check_disk            # Uso de disco y espacio disponible
+│   ├── check_cpu             # Carga de CPU y core count
+│   ├── check_ram             # Uso de memoria RAM
+│   ├── check_fail2ban        # Estado de jails e IPs bloqueadas
+│   ├── check_connections     # Conexiones de red activas
+│   ├── check_updates         # Actualizaciones de sistema pendientes
+│   ├── check_processes       # Procesos en ejecución
+│   ├── show_history          # Historial de métricas de seguridad
+│   └── log-analyzer          # Análisis de logs del sistema
+├── scripts/
+│   ├── sec                   # CLI principal del agente
+│   ├── sec-agent             # Wrapper de ejecución del agente
+│   ├── sec-chat              # CLI para chat y herramientas MCP
+│   ├── remote_deploy.sh      # Script de despliegue automatizado (7 pasos)
+│   └── security_audit.sh     # Auditoría automatizada de 5 controles perimetrales
+├── tests/
+│   └── live_demo_trigger.ps1 # Simulación de ataque fuerza bruta (PowerShell 5.1)
+├── docs/
+│   ├── presentation_guide.md # Guía de defensa ante tribunal
+│   ├── api_spec.yaml         # Contrato OpenAPI 3.0.3 de los endpoints REST
+│   └── architecture.txt      # Diagrama de flujo arquitectónico
+├── .github/workflows/
+│   └── ci.yml                # Pipeline CI/CD (GitHub Actions)
+├── edge-sec-agent.service    # Unit de systemd para Gunicorn
+├── nginx_agent.conf          # Configuración de Nginx reverse proxy
+├── wsgi.py                   # Entry point WSGI para producción
+├── Dockerfile                # Definición de contenedor alternativo
+├── Makefile                  # Orquestador de comandos locales
+├── requirements.txt          # Dependencias Python formales
+├── secrets.env.example       # Plantilla de variables de entorno
+├── LICENSE                   # Licencia MIT
+├── CHANGELOG.md              # Historial de versiones
+└── README.md                 # Documentación técnica (este archivo)
+```
+
 ---
 
 **Especificaciones de Entorno:** Hardware: Orange Pi Zero 3 (ARM64) | Sistema Operativo: DietPi v12 (Debian Bookworm) | Estado del Entorno: Producción Verificada.
