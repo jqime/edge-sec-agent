@@ -1,0 +1,29 @@
+openapi: 3.0.3
+info:
+  title: Edge Security Agent API
+  description: Contrato de servicios REST para el monitoreo de métricas analíticas de seguridad perimetral.
+  version: 1.0.0
+paths:
+  /v1/global/health:
+    get:
+      summary: Endpoint de Health Check
+      description: Retorna el estado de salud de la API y el backend. Requiere autenticación básica.
+      responses:
+        '200':
+          description: Nodo operativo y saludable.
+        '401':
+          description: Credenciales inválidas o ausentes.
+  /metrics:
+    get:
+      summary: Endpoint de Métricas Prometheus
+      description: Expone métricas de infraestructura en formato nativo de texto para Prometheus.
+      responses:
+        '200':
+          description: Métricas consumidas con éxito.
+  /api/metrics:
+    get:
+      summary: Historial Analítico de Métricas
+      description: Retorna el histórico agregado de eventos de seguridad perimetral almacenados en SQLite.
+      responses:
+        '200':
+          description: Datos serializados en formato JSON.
