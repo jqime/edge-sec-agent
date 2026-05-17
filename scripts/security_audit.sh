@@ -56,14 +56,14 @@ echo ""
 ###############################################################################
 echo -e "${BOLD}[1/5] Firewall: Regla DROP en puerto 22${NC}"
 
-if iptables -L INPUT -n 2>/dev/null | grep -q "dpt:22.*DROP"; then
-    print_result "Regla DROP puerto 22 (IPv4)" "pass" "$(iptables -L INPUT -n | grep 'dpt:22.*DROP')"
+if iptables -L INPUT -n 2>/dev/null | grep -E "dpt:22|dport 22" | grep -q "DROP"; then
+    print_result "Regla DROP puerto 22 (IPv4)" "pass" "$(iptables -L INPUT -n | grep -E "dpt:22|dport 22" | grep "DROP")"
 else
     print_result "Regla DROP puerto 22 (IPv4)" "fail" "No se encontró regla DROP para dport 22 en iptables"
 fi
 
-if ip6tables -L INPUT -n 2>/dev/null | grep -q "dpt:22.*DROP"; then
-    print_result "Regla DROP puerto 22 (IPv6)" "pass" "$(ip6tables -L INPUT -n | grep 'dpt:22.*DROP')"
+if ip6tables -L INPUT -n 2>/dev/null | grep -E "dpt:22|dport 22" | grep -q "DROP"; then
+    print_result "Regla DROP puerto 22 (IPv6)" "pass" "$(ip6tables -L INPUT -n | grep -E "dpt:22|dport 22" | grep "DROP")"
 else
     print_result "Regla DROP puerto 22 (IPv6)" "fail" "No se encontró regla DROP para dport 22 en ip6tables"
 fi
