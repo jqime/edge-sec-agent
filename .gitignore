@@ -1,31 +1,34 @@
+# Python
 __pycache__/
 *.pyc
-*.log
-memory.json
-.env
-.DS_Store
-memory.db
+*.pyo
 
-# Bases de datos y logs locales
+# Databases
+*.db
 memory.db
-*.log
-reports/
-__pycache__/
-*.pyc
-*.deb
-dropbear
-sec-api.service
-
-# Archivos locales y temporales
-memory.db
-reports/
-*.log
-*.pyc
-__pycache__/
-*.deb
-dropbear
-sec-api.service
-secrets.env
 data/history.db
+
+# Logs
+*.log
+
+# Secrets and credentials
+secrets.env
+.env
+
+# Reports and backups
+reports/
 backups/
+
+# Build artifacts
+*.deb
+
+# Legacy service files
+dropbear
+sec-api.service
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backups
 src/*.bak*
