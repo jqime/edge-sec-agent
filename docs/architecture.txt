@@ -1,0 +1,10 @@
+[Peticiones de Red Externas]
+       │ (Puerto 8443 - HTTPS / TLS 1.3)
+       ▼
+[Proxy Inverso: Nginx]  ───(Filtro de Errores)───► [Fail2Ban] ──► Inyección Reglas [iptables (Kernel)]
+       │ (Aislamiento en Loopback - Puerto 5000)
+       ▼
+[WSGI HTTP Server: Gunicorn]
+       │ (Rutinas Python)
+       ▼
+[Core API: Flask App] ◄───(Persistente / Pruning)───► [Almacenamiento: SQLite DB]
