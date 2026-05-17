@@ -1,0 +1,30 @@
+#!/bin/bash
+set -euo pipefail
+
+# check_fail2ban - Verifica estado de fail2ban, jails activos e IPs bloqueadas
+
+if ! command -v fail2ban-client &>/dev/null; then
+    echo '{"status":"WARNING","message":"fail2ban-client not installed","total_banned_ips":0,"jails_stat":{}}'
+    exit 0
+fi
+
+JAILS=$(fail2ban-client status 2>/dev/null | grep "Jail list" | sed 's/.*: //' | tr ',' ' ' || echo "")
+if [ -z "$JAILS" ]; then
+    echo '{"status":"OK","message":"no active jails","total_banned_ips":0,"jails_stat":{}}'
+    exit 0
+fi
+
+TOTAL=0
+JAILS_JSON="{"
+FIRST=true
+for JAIL in $JAILS; do
+    JAIL=$(echo "$JAIL" | xargs)
+    [ -z "$JAIL" ] && continue
+    BANNED=$(fail2ban-client status "$JAIL" 2>/dev/null | grep "Currently banned" | awk '{print $NF}' || echo "0")
+    TOTAL=$((TOTAL + BANNED))
+    if [ "$FIRST" = true ]; then FIRST=false; else JAILS_JSON+=","; fi
+    JAILS_JSON+="\"$JAIL\":$BANNED"
+done
+JAILS_JSON+="}"
+
+echo "{\"status\":\"OK\",\"total_banned_ips\":$TOTAL,\"jails_stat\":$JAILS_JSON}"
