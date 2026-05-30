@@ -5,8 +5,8 @@ Wants=nginx.service
 
 [Service]
 Type=notify
-User=root
-Group=root
+User=edgesec
+Group=edgesec
 WorkingDirectory=/root/edge-sec-agent
 Environment="PATH=/root/edge-sec-agent/venv/bin"
 ExecStart=/root/edge-sec-agent/venv/bin/gunicorn \
