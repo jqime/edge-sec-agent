@@ -1,3 +1,8 @@
+[![CI](https://github.com/jqime/edge-sec-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/jqime/edge-sec-agent/actions/workflows/ci.yml)
+![Tests](https://img.shields.io/badge/tests-38%20passed-brightgreen)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![Platform](https://img.shields.io/badge/platform-ARM64-orange)
+
 # Edge Security Agent: Arquitectura Hardened para Entornos Embebidos (Orange Pi Zero 3)
 
 ## 1. Resumen Ejecutivo
