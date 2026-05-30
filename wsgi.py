@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """
-wsgi.py - Punto de entrada WSGI para producción (Gunicorn/uWSGI).
+wsgi.py — Punto de entrada WSGI para producción (Gunicorn/uWSGI).
 """
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 from src.sec_web import app
 
