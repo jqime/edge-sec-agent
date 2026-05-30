@@ -20,7 +20,7 @@ FIRST=true
 for JAIL in $JAILS; do
     JAIL=$(echo "$JAIL" | xargs)
     [ -z "$JAIL" ] && continue
-    BANNED=$(fail2ban-client status "$JAIL" 2>/dev/null | grep "Currently banned" | awk '{print $NF}' || echo "0")
+    BANNED=$(fail2ban-client status "$JAIL" 2>/dev/null | grep -oP "Currently banned:\s*\K\d+" || echo "0")
     TOTAL=$((TOTAL + BANNED))
     if [ "$FIRST" = true ]; then FIRST=false; else JAILS_JSON+=","; fi
     JAILS_JSON+="\"$JAIL\":$BANNED"
