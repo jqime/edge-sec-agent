@@ -4,7 +4,7 @@ test:
 	powershell.exe -ExecutionPolicy Bypass -File .\tests\live_demo_trigger.ps1
 
 audit:
-	powershell.exe -ExecutionPolicy Bypass -File .\scripts\security_audit.sh
+	bash scripts/security_audit.sh
 
 deploy:
 	bash scripts/remote_deploy.sh

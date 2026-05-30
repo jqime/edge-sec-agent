@@ -6,6 +6,15 @@ NGINX_CONF_SRC="$REPO_DIR/nginx_agent.conf"
 NGINX_CONF_DST="/etc/nginx/sites-enabled/edge-sec-agent.conf"
 NGINX_CONF_AVAIL="/etc/nginx/sites-available/edge-sec-agent.conf"
 
+# Cargar BASIC_AUTH_PASS desde secrets.env o variable de entorno
+SECRETS_ENV="$REPO_DIR/secrets.env"
+if [ -f "$SECRETS_ENV" ]; then
+    set -o allexport
+    source "$SECRETS_ENV"
+    set +o allexport
+fi
+: "${BASIC_AUTH_PASS:?Error: BASIC_AUTH_PASS no definida en secrets.env ni en entorno}"
+
 echo "=== Edge Sec Agent - Remote Deploy ==="
 
 # 1. Actualizar código desde Git
@@ -48,16 +57,15 @@ else
     echo "    TLS certificate already exists — skipping generation"
 fi
 
-# 3b. Crear archivo Basic Auth para Nginx (admin / EdgeSec2026!)
+# 3b. Crear archivo Basic Auth para Nginx (admin / $BASIC_AUTH_PASS)
 HTPASSWD_FILE="/etc/nginx/.htpasswd"
 if [ ! -f "$HTPASSWD_FILE" ]; then
     echo "    Creating Basic Auth credentials..."
-    # Generar hash APR1-MD5 compatible con Nginx
-    HASH=$(openssl passwd -apr1 'EdgeSec2026!' 2>/dev/null)
+    HASH=$(openssl passwd -apr1 "$BASIC_AUTH_PASS" 2>/dev/null)
     echo "admin:${HASH}" > "$HTPASSWD_FILE"
     chmod 640 "$HTPASSWD_FILE"
     chown root:www-data "$HTPASSWD_FILE" 2>/dev/null || true
-    echo "    Basic Auth: admin / EdgeSec2026!"
+    echo "    Basic Auth credentials created"
 else
     echo "    Basic Auth file already exists — skipping creation"
 fi

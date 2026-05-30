@@ -14,6 +14,15 @@ set -euo pipefail
 #         [FAIL] en rojo para comprobaciones fallidas
 ###############################################################################
 
+# Cargar BASIC_AUTH_PASS desde secrets.env o variable de entorno
+SECRETS_ENV="/root/edge-sec-agent/secrets.env"
+if [ -f "$SECRETS_ENV" ]; then
+    set -o allexport
+    source "$SECRETS_ENV"
+    set +o allexport
+fi
+: "${BASIC_AUTH_PASS:?Error: BASIC_AUTH_PASS no definida en secrets.env ni en entorno}"
+
 # Colores ANSI para salida en terminal
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -146,7 +155,7 @@ echo ""
 echo -e "${BOLD}[5/5] Health Check: Endpoint /v1/global/health (HTTPS + Auth)${NC}"
 
 HTTP_CODE=$(curl -sk -o /tmp/health_response.json -w "%{http_code}" \
-    -u admin:EdgeSec2026! \
+    -u "admin:${BASIC_AUTH_PASS}" \
     https://127.0.0.1:8443/v1/global/health 2>/dev/null || echo "000")
 
 if [ "$HTTP_CODE" = "200" ]; then
