@@ -21,7 +21,7 @@ _project_root = os.path.dirname(os.path.dirname(__file__))
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from src.database import insert_metric, get_last_days_scores
+from src.database import insert_metric, get_last_days_scores  # noqa: E402
 
 logger = logging.getLogger("edge-sec-agent.agent")
 
@@ -193,10 +193,10 @@ def _get_ram_usage_percent() -> float | None:
 def _compute_score(
     ssh: int, ports: list[str], temp: float | None, ram: float | None
 ) -> int:
-    penalties = min(ssh * 2, 60)
+    penalties = float(min(ssh * 2, 60))
     allowed = {22, 80, 443, 25, 53}
     risk_ports = sum(1 for p in ports if int(p) not in allowed)
-    penalties += min(risk_ports * 8, 40)
+    penalties += float(min(risk_ports * 8, 40))
     if temp is not None and temp > 55:
         penalties += min((temp - 55) * 1.5, 25)
     if ram is not None and ram > 60:
@@ -254,7 +254,7 @@ def _format_html_report(
         history7_html = f"""
         <div style="margin-top:20px;"><canvas id="scoreChart" width="800" height="240"></canvas></div>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <script>const history7 = {history7_js}; const labels = history7.map(d=>d.date); const data = history7.map(d=>d.score); new Chart(document.getElementById('scoreChart'),{{type:'line',data:{labels:labels,datasets:[{label:'Score',data:data,borderColor:'rgb(75,192,192)',fill:false}]},options:{{responsive:true,scales:{{y:{{beginAtZero:true,max:100}}}}}}}})</script>
+        <script>const chartData = {history7_js}; const labels = chartData.map(d=>d.date); const data = chartData.map(d=>d.score); new Chart(document.getElementById('scoreChart'),{{type:'line',data:{{labels:labels,datasets:[{{label:'Score',data:data,borderColor:'rgb(75,192,192)',fill:false}}]}},options:{{responsive:true,scales:{{y:{{beginAtZero:true,max:100}}}}}}}})</script>
         """
     score_class = "green" if score >= 70 else ("orange" if score >= 50 else "red")
     html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Seguridad - {ts}</title><style>

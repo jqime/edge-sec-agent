@@ -22,6 +22,16 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+
+    - name: Lint con Ruff
+      run: ruff check src/ tests/
+
+    - name: Type check con Mypy
+      run: mypy src/ --ignore-missing-imports
+
+    - name: Tests con pytest
+      run: pytest tests/ -v --tb=short
 
     - name: Validar sintaxis con Compileall
       run: python -m compileall src/

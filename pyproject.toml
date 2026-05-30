@@ -1,0 +1,12 @@
+[project]
+name = "edge-sec-agent"
+version = "1.0.0"
+description = "DevSecOps autonomous perimeter security ecosystem for edge computing devices"
+requires-python = ">=3.10"
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
