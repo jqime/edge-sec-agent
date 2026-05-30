@@ -86,12 +86,12 @@ else
   ALL_OK=false
 fi
 
-# 8) Health endpoint del proxy (ruta correcta)
-URL_PROXY="http://127.0.0.1:8765/v1/global/health"
-if curl -sSf "$URL_PROXY" >/dev/null 2>&1; then
-  print_ok "Proxy OpenAI health endpoint disponible"
+# 8) Health endpoint canónico (Flask+Gunicorn en puerto 5000)
+URL_API="http://127.0.0.1:5000/v1/global/health"
+if curl -sSf "$URL_API" >/dev/null 2>&1; then
+  print_ok "Health endpoint canónico disponible en 5000"
 else
-  print_warn "Proxy OpenAI health endpoint no disponible"
+  print_warn "Health endpoint canónico no disponible en 5000"
   ALL_OK=false
 fi
 

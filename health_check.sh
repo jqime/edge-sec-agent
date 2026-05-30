@@ -6,6 +6,6 @@ if command -v jq >/dev/null; then
     SCORE=$(sec-agent --security --json 2>/dev/null | jq -r '.score // "N/A"')
     echo "Puntuación actual: $SCORE"
 fi
-curl -sS http://localhost:8765/v1/global/health >/dev/null && echo -e "${GREEN}✅ API REST responde${NC}" || echo -e "${RED}❌ API REST no responde${NC}"
+curl -sS http://localhost:5000/v1/global/health >/dev/null && echo -e "${GREEN}✅ API REST responde${NC}" || echo -e "${RED}❌ API REST no responde${NC}"
 curl -sS http://localhost:8080 >/dev/null && echo -e "${GREEN}✅ Dashboard web responde${NC}" || echo -e "${YELLOW}⚠️ Dashboard no accesible${NC}"
 echo "Fecha: $(date)"

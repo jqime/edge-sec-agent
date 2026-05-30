@@ -3,19 +3,20 @@
 """
 sec_web.py — Servidor web Flask para Edge Sec Agent.
 Endpoints:
-  /v1/global/health  → estado del sistema + métricas de salud
-  /metrics           → endpoint estilo Prometheus
-  /api/metrics       → JSON completo de seguridad
-  /                  → dashboard mínimo
+  /v1/global/health   → estado del sistema + métricas de salud
+  /metrics            → endpoint estilo Prometheus
+  /api/metrics        → JSON completo de seguridad
+  /v1/models          → listado de modelos (compatible OpenAI)
+  /v1/chat/completions → chat compatible OpenAI
+  /ask                → legacy chat
+  /                   → dashboard mínimo
 """
-import json
 import logging
-import os
 import re
 import subprocess
 from typing import Any
 
-from flask import Flask, jsonify, Response
+from flask import Flask, jsonify, Response, request
 
 from src.agent import (
     _count_ssh_failures,
@@ -185,6 +186,60 @@ def api_metrics() -> tuple[Response, int]:
         return jsonify({"error": str(exc)}), 500
 
 
+@app.route("/v1/models")
+def list_models() -> tuple[Response, int]:
+    """Endpoint compatible OpenAI para listar modelos disponibles."""
+    return jsonify({
+        "object": "list",
+        "data": [{"id": "sec-agent", "object": "model"}],
+    }), 200
+
+
+@app.route("/v1/chat/completions", methods=["POST"])
+def chat_completions() -> tuple[Response, int]:
+    """Endpoint compatible OpenAI — ejecuta sec-agent con el mensaje del usuario."""
+    data = request.get_json(silent=True) or {}
+    messages = data.get("messages", [])
+    pregunta = ""
+    for m in messages:
+        if m.get("role") == "user":
+            pregunta = m.get("content", "")
+            break
+    if not pregunta:
+        pregunta = "estado"
+    try:
+        result = subprocess.run(
+            ["sec-agent", pregunta],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        respuesta = result.stdout.strip()
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        respuesta = "Error ejecutando sec-agent"
+    return jsonify({
+        "choices": [{"message": {"role": "assistant", "content": respuesta}}],
+    }), 200
+
+
+@app.route("/ask", methods=["POST"])
+def ask() -> tuple[Response, int]:
+    """Endpoint legacy — ejecuta sec-agent con la pregunta del usuario."""
+    data = request.get_json(silent=True) or {}
+    pregunta = data.get("pregunta", "")
+    try:
+        result = subprocess.run(
+            ["sec-agent", pregunta],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        respuesta = result.stdout.strip()
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        respuesta = "Error ejecutando sec-agent"
+    return jsonify({"respuesta": respuesta}), 200
+
+
 @app.route("/")
 def index() -> str:
     return (
@@ -192,7 +247,8 @@ def index() -> str:
         "<h1>Edge Sec Agent Dashboard</h1>"
         "<p><a href='/api/metrics'>/api/metrics</a> | "
         "<a href='/v1/global/health'>/v1/global/health</a> | "
-        "<a href='/metrics'>/metrics (Prometheus)</a></p>"
+        "<a href='/metrics'>/metrics (Prometheus)</a> | "
+        "<a href='/v1/models'>/v1/models</a></p>"
         "</body></html>"
     )
 

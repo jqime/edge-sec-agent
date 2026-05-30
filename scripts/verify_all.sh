@@ -72,7 +72,7 @@ check_sec_web_service() {
 
 # 2) Verificar todos los servicios clave
 check_services_status() {
-  SERVICES=(sec-proxy sec-web sec-report.timer sec-api.service)
+  SERVICES=(sec-proxy sec-web sec-report.timer edge-sec-agent.service)
   for s in "${SERVICES[@]}"; do
     if systemctl is-active --quiet "$s"; then
       printf "✔ %s: " "$s"; print_ok "activo"
@@ -81,11 +81,11 @@ check_services_status() {
     fi
   done
 
-  # Verificar API REST base (si está disponible)
-  if curl -sSf http://127.0.0.1:8765/ask >/dev/null 2>&1; then
-    print_ok "API REST (sec-api) responde en 8765"
+  # Verificar API REST canónica (Flask+Gunicorn en puerto 5000)
+  if curl -sSf http://127.0.0.1:5000/api/metrics >/dev/null 2>&1; then
+    print_ok "API REST (sec_web.py) responde en 5000"
   else
-    print_warn "API REST (sec-api) no responde en 8765"
+    print_warn "API REST (sec_web.py) no responde en 5000"
   fi
 }
 
@@ -108,7 +108,7 @@ check_sec_agent_json() {
 
 # 4) health endpoint del proxy
 check_health_endpoint() {
-  URL="http://192.168.1.141:8765/v1/global/health"
+  URL="http://127.0.0.1:5000/v1/global/health"
   if curl -sSf "$URL" >/dev/null 2>&1; then
     HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$URL")
     if [ "$HTTP_CODE" -eq 200 ]; then
@@ -166,7 +166,7 @@ echo "==== Resumen final ===="
 ALL_OK=true
 if ! systemctl is-active --quiet sec-web.service; then ALL_OK=false; fi
 if ! command -v sec-agent >/dev/null 2>&1; then ALL_OK=false; fi
-if ! curl -sSf "http://127.0.0.1:8765/v1/global/health" >/dev/null 2>&1; then ALL_OK=false; fi
+if ! curl -sSf "http://127.0.0.1:5000/v1/global/health" >/dev/null 2>&1; then ALL_OK=false; fi
 if [ "$ALL_OK" = true ]; then
   echo -e "\n${GREEN}TODO listo: el sistema Edge Sec Agent está preparado para producción.${RESET}"
 else
