@@ -32,3 +32,4 @@ Thumbs.db
 
 # Backups
 src/*.bak*
+venv/
