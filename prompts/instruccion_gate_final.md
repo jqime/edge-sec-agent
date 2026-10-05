@@ -1,0 +1,1 @@
+No ejecutes `git commit` ni `git push` como parte de una suposición o por llegar al final de una fase. El commit y el push solo están autorizados después de ejecutar íntegramente la sección "GATE FINAL OBLIGATORIO ANTES DE COMMIT Y PUSH", actualizar `AGENTS.md` con evidencias reales y confirmar que no existe ningún bloqueo.
