@@ -17,7 +17,7 @@ def _isolate_db():
         pass
 
 
-from src.sec_web import app  # noqa: E402
+from src.sec_web import app
 
 
 @pytest.fixture

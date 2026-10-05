@@ -1,5 +1,4 @@
-﻿#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 """
 agent.py — Módulo principal de recolección y análisis de seguridad.
 Obtiene métricas del sistema (SSH, puertos, temperatura, RAM),
@@ -13,7 +12,7 @@ import re
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 # Permitir 'from src.xxx' cuando se ejecuta como script directamente
@@ -21,7 +20,7 @@ _project_root = os.path.dirname(os.path.dirname(__file__))
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from src.database import insert_metric, get_last_days_scores  # noqa: E402
+from src.database import get_last_days_scores, insert_metric
 
 logger = logging.getLogger("edge-sec-agent.agent")
 
@@ -62,6 +61,7 @@ def _run_command(cmd: str, timeout: int = 10) -> str:
             capture_output=True,
             text=True,
             timeout=timeout,
+            check=True,
         )
         return r.stdout.strip() or r.stderr.strip() or "-"
     except (subprocess.TimeoutExpired, OSError) as exc:
@@ -291,7 +291,7 @@ def _generate_html_recommendations(
 
 def save_html_report(html_text: str) -> str:
     os.makedirs(REPORTS_DIR, exist_ok=True)
-    path = os.path.join(REPORTS_DIR, f"security_{datetime.now().strftime('%Y%m%d-%H%M%S')}.html")
+    path = os.path.join(REPORTS_DIR, f"security_{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.html")
     with open(path, "w", encoding="utf-8") as f:
         f.write(html_text)
     logger.info("Informe HTML guardado: %s", path)
@@ -300,7 +300,7 @@ def save_html_report(html_text: str) -> str:
 
 def save_report(text: str) -> str:
     os.makedirs(REPORTS_DIR, exist_ok=True)
-    path = os.path.join(REPORTS_DIR, f"security_{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt")
+    path = os.path.join(REPORTS_DIR, f"security_{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.txt")
     with open(path, "w") as f:
         f.write(text)
     logger.info("Informe TXT guardado: %s", path)
@@ -367,7 +367,7 @@ def cmd_security(json_output: bool = False) -> dict[str, Any]:
             "report_path": path,
         }
     except (OSError, ValueError, TypeError) as exc:
-        logger.error("Error en cmd_security: %s", exc, exc_info=True)
+        logger.exception("Error en cmd_security")
         print(f"[ERROR] {exc}", file=sys.stderr)
         return {"score": 0, "error": True, "message": str(exc)}
 

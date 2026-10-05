@@ -1,27 +1,14 @@
-#!/usr/bin/env python3
+#!/usr/bin/env bash
+# -*- coding: utf-8 -*-
 """
 ⚠️  DEPRECATED — scripts/sec-api ha sido reemplazado por src/sec_web.py (Flask+Gunicorn).
 
 El servidor canónico es edge-sec-agent.service (Gunicorn) en 127.0.0.1:5000,
 expuesto a través de Nginx reverse proxy en puerto 8443 con TLS + Basic Auth.
 
-Todos los endpoints migrados:
-  GET  /v1/models           → src/sec_web.py
-  GET  /v1/global/health    → src/sec_web.py
-  GET  /metrics             → src/sec_web.py
-  GET  /api/metrics         → src/sec_web.py
-  POST /v1/chat/completions → src/sec_web.py
-  POST /ask                 → src/sec_web.py
-  GET  /                    → src/sec_web.py
-
-Para arrancar el servidor canónico:
-  systemctl start edge-sec-agent.service
-
-O manualmente:
-  cd /root/edge-sec-agent && gunicorn --bind 127.0.0.1:5000 wsgi:app
+Uso:
+  scripts/sec-api   → muestra mensaje de deprecación
+  systemctl start edge-sec-agent.service  → inicia el servicio canónico
 """
-import sys
-
-print("[DEPRECATED] sec-api ha sido reemplazado por sec_web.py (Flask+Gunicorn).", file=sys.stderr)
-print("[DEPRECATED] Usa: systemctl start edge-sec-agent.service", file=sys.stderr)
-sys.exit(1)
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHONPATH="${REPO_DIR}/src:${PYTHONPATH:-}" exec python3 "${REPO_DIR}/src/sec_web.py" "$@"
