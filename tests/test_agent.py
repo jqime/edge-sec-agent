@@ -4,7 +4,6 @@ from unittest.mock import mock_open, patch
 
 import pytest
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────
 
 @pytest.fixture(autouse=True)
@@ -29,8 +28,7 @@ def _clean_env():
 
 
 # Importar agent DESPUÉS de los fixtures de entorno
-import src.agent as agent  # noqa: E402
-
+from src import agent
 
 # ── _compute_score ────────────────────────────────────────────────────────
 
@@ -80,9 +78,8 @@ class TestCountSshFailures:
             "Feb 10 10:01:00 host sshd[124]: Failed password for invalid user admin from 10.0.0.2 port 22 ssh2\n"
             "Feb 10 10:02:00 host sshd[125]: Accepted password for root from 10.0.0.1 port 22 ssh2\n"
         )
-        with patch("builtins.open", mock_open(read_data=log_content)):
-            with patch.dict(os.environ, {"SSH_LOG_PATHS": self.SSH_LOG_PATHS}, clear=False):
-                assert agent._count_ssh_failures() == 2
+        with patch("builtins.open", mock_open(read_data=log_content)), patch.dict(os.environ, {"SSH_LOG_PATHS": self.SSH_LOG_PATHS}, clear=False):
+            assert agent._count_ssh_failures() == 2
 
     @patch("os.path.exists", return_value=True)
     def test_counts_authentication_failure(self, mock_exists):
@@ -90,9 +87,8 @@ class TestCountSshFailures:
             "Feb 10 10:00:00 host sshd[123]: Authentication failure for root from 10.0.0.1 port 22\n"
             "Feb 10 10:01:00 host login[456]: authentication failure; logname= uid=0 euid=0 tty=ssh\n"
         )
-        with patch("builtins.open", mock_open(read_data=log_content)):
-            with patch.dict(os.environ, {"SSH_LOG_PATHS": self.SSH_LOG_PATHS}, clear=False):
-                assert agent._count_ssh_failures() == 2
+        with patch("builtins.open", mock_open(read_data=log_content)), patch.dict(os.environ, {"SSH_LOG_PATHS": self.SSH_LOG_PATHS}, clear=False):
+            assert agent._count_ssh_failures() == 2
 
     @patch("os.path.exists", return_value=True)
     def test_mixed_log_lines(self, mock_exists):
@@ -102,9 +98,8 @@ class TestCountSshFailures:
             "Feb 10 10:02:00 host sshd[125]: Connection closed by 10.0.0.1 port 22\n"
             "Feb 10 10:03:00 host sshd[126]: Did not receive identification string from 10.0.0.2\n"
         )
-        with patch("builtins.open", mock_open(read_data=log_content)):
-            with patch.dict(os.environ, {"SSH_LOG_PATHS": self.SSH_LOG_PATHS}, clear=False):
-                assert agent._count_ssh_failures() == 2
+        with patch("builtins.open", mock_open(read_data=log_content)), patch.dict(os.environ, {"SSH_LOG_PATHS": self.SSH_LOG_PATHS}, clear=False):
+            assert agent._count_ssh_failures() == 2
 
     @patch("os.path.exists", return_value=False)
     def test_no_log_files(self, mock_exists):

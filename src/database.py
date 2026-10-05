@@ -1,14 +1,13 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+
 """
 database.py — Módulo de persistencia SQLite unificado para Edge Sec Agent.
 Almacena métricas de seguridad, hardware y rendimiento en una sola tabla.
 Usado por agent.py (CLI) y sec_web.py (API).
 """
-import sqlite3
-import os
 import logging
-from datetime import datetime, timedelta
+import os
+import sqlite3
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 logger = logging.getLogger("edge-sec-agent.db")
@@ -106,7 +105,7 @@ def insert_metric(
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
                 score,
                 ssh_failures,
                 open_ports,
@@ -154,7 +153,7 @@ def get_latest() -> dict[str, Any] | None:
 
 
 def get_last_days_scores(days: int = 7) -> list[dict[str, Any]]:
-    start = (datetime.now() - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    start = (datetime.now(timezone.utc) - timedelta(days=days - 1)).strftime("%Y-%m-%d")
     conn = _get_conn()
     try:
         rows = conn.execute(
@@ -179,7 +178,7 @@ def get_last_days_scores(days: int = 7) -> list[dict[str, Any]]:
 
 
 def prune_old_metrics(days: int = 30) -> int:
-    cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
     conn = _get_conn()
     try:
         deleted = conn.execute(
