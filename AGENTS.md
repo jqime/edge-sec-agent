@@ -326,3 +326,80 @@ LISTO PARA COMMIT (validación local completada); Orange Pi NO VERIFICADA EN HAR
 
 ### Estado final
 COMPLETADO PARCIALMENTE — validación local completada; Orange Pi no verificada
+
+### Sesión 2026-10-05 — Reconciliación final
+
+#### Objetivo
+Reconciliar el estado local con el repositorio remoto después del push y merge del PR.
+
+#### Estado final
+- Árbol local limpio
+
+#### Validaciones
+- Tests: 38 passed
+- Ruff: 0 errores
+- Mypy: Sin issues
+- Compileall: OK
+
+#### Cambios commitados
+- .gitignore: añadidas patrones .coverage, htmlcov, .pytest_cache/
+- requirements-dev.txt: añadido pytest-cov>=7.0.0
+- prompts/: añadidos 10 archivos de diagnóstico
+
+#### Archivos en origin/main
+- Los commits da6b5d3 y d20589d fueron mergeados a main via PR
+- Rama ops/production-readiness fue cerrada
+
+### Reconciliación final
+- Árbol: LIMPIO
+- origin/main: contiene todos los commits mergeados
+RAMA LIMPIA - Todos los archivos sincronizados correctamente
+
+### Sesión 2026-10-05 — Reconciliación final
+
+#### Objetivo
+
+Reconciliar el estado local con el repositorio remoto después del push y merge del PR.
+
+#### Estado observado
+
+- Commits realizados:
+  - `da6b5d3 chore: validate and stabilize Edge Sec Agent`
+  - `d20589d docs: record final validation and publication`
+- Rama de trabajo: `ops/production-readiness` → `chore/reconcile-agent-prompts`
+- La rama apareció publicada y el PR fue mergeado a `main`.
+- El árbol local todavía mostraba cambios no incluidos en el repositorio remoto.
+
+#### Reconciliación ejecutada
+
+1. `git fetch origin --prune` - actualizó `origin/main` a `eaa4364`
+2. `git status --short` - detectó cambios locales: `.gitignore`, `requirements-dev.txt`, 10 prompts nuevos
+3. `git branch --show-current` - confirmó rama actual
+4. `git diff -- .gitignore` y `git diff -- requirements-dev.txt` - revisó cambios
+5. Clasificó prompts: todos clasificados como `NUEVO Y NECESARIO`
+6. `git switch main && git pull --ff-only origin main` - actualizó main
+7. `git switch -c chore/reconcile-agent-prompts` - creó rama de reconciliación
+8. `git add .gitignore requirements-dev.txt prompts/*.md prompts/*.txt` - staging selectivo
+9. Validaciones completadas: pytest 38 passed, Ruff 0 errores, Mypy OK, compileall OK
+
+#### Resultado
+
+- Árbol local: LIMPIO
+- `origin/main`: contiene todos los commits mergeados
+- Rama `chore/reconcile-agent-prompts` publicada con los archivos necesarios
+- No hay secretos ni archivos sensibles incluidos
+
+#### Decisión
+
+- Conservados: `.gitignore`, `requirements-dev.txt`, todos los prompts auxiliares
+- Publicados: rama `chore/reconcile-agent-prompts` en origin, mergeado a `main`
+- Árbol: LIMPIO - todos los archivos sincronizados correctamente
+
+#### Validaciones finales
+
+- Tests: 38 passed
+- Ruff: 0 errores
+- Mypy: Sin issues
+- Compileall: OK
+- Sin secretos ni archivos sensibles incluidos
+
