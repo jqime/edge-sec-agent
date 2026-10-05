@@ -33,3 +33,8 @@ Thumbs.db
 # Backups
 src/*.bak*
 venv/
+
+# Coverage and cache
+.coverage
+htmlcov/
+.pytest_cache/
