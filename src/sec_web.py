@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+
 """
 sec_web.py — Servidor web Flask para Edge Sec Agent.
 Endpoints:
@@ -16,14 +15,14 @@ import re
 import subprocess
 from typing import Any
 
-from flask import Flask, jsonify, Response, request
+from flask import Flask, Response, jsonify, request
 
 from src.agent import (
+    _compute_score,
     _count_ssh_failures,
     _get_open_ports,
-    _get_temperature_c,
     _get_ram_usage_percent,
-    _compute_score,
+    _get_temperature_c,
 )
 from src.database import get_latest
 
@@ -52,11 +51,12 @@ def _get_fail2ban_banned_ips() -> int:
             capture_output=True,
             text=True,
             timeout=5,
+            check=True,
         )
         match = re.search(r"Total banned:\s*(\d+)", result.stdout)
         if match:
             return int(match.group(1))
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError) as exc:
         logger.debug("fail2ban-client no disponible: %s", exc)
     return 0
 
@@ -182,7 +182,7 @@ def api_metrics() -> tuple[Response, int]:
             "ram_percent": ram,
         }), 200
     except Exception as exc:
-        logger.error("Error en /api/metrics: %s", exc, exc_info=True)
+        logger.exception("Error en /api/metrics")
         return jsonify({"error": str(exc)}), 500
 
 
@@ -213,9 +213,10 @@ def chat_completions() -> tuple[Response, int]:
             capture_output=True,
             text=True,
             timeout=30,
+            check=True,
         )
         respuesta = result.stdout.strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError):
         respuesta = "Error ejecutando sec-agent"
     return jsonify({
         "choices": [{"message": {"role": "assistant", "content": respuesta}}],
@@ -233,9 +234,10 @@ def ask() -> tuple[Response, int]:
             capture_output=True,
             text=True,
             timeout=30,
+            check=True,
         )
         respuesta = result.stdout.strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError):
         respuesta = "Error ejecutando sec-agent"
     return jsonify({"respuesta": respuesta}), 200
 
