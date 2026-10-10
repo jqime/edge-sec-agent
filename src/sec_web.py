@@ -172,9 +172,10 @@ def _check_sqlite() -> dict[str, Any]:
                 "latency_ms": round((time.monotonic() - started) * 1000.0, 2),
             }
         except sqlite3.Error as exc:
+            logger.debug("SQLite quick_check falló: %s", exc)
             return {
                 "ok": False,
-                "detail": str(exc),
+                "detail": "error",
                 "latency_ms": round((time.monotonic() - started) * 1000.0, 2),
             }
 
