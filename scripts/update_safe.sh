@@ -78,9 +78,15 @@ run_cmd systemctl restart "$SERVICE_NAME"
 
 if [[ "$DRY_RUN" -eq 0 ]]; then
   if ! curl --fail --silent --show-error --max-time 10 "$HEALTH_URL" >/dev/null; then
-    echo "Health check post-update falló. Rollback a $OLD_SHA" >&2
-    git -C "$APP_DIR" reset --hard "$OLD_SHA"
-    systemctl restart "$SERVICE_NAME"
+    echo "Health check post-update falló. Iniciando rollback a $OLD_SHA..." >&2
+    git -C "$APP_DIR" reset --hard "$OLD_SHA" >/dev/null 2>&1
+    run_cmd systemctl restart "$SERVICE_NAME" >/dev/null 2>&1
+    sleep 2
+    if curl --fail --silent --show-error --max-time 10 "$HEALTH_URL" >/dev/null; then
+      echo "Rollback completado: health check exitoso tras restauración a $OLD_SHA" >&2
+    else
+      echo "Rollback verificado: health check continúa fallando tras restauración a $OLD_SHA" >&2
+    fi
     exit 1
   fi
 fi
