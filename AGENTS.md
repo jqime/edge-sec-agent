@@ -606,7 +606,7 @@ Realizar auditoría completa del sistema Orange Pi y del repositorio, verificar 
 | / | GET | 200 | OK |
 | /v1/global/health | GET | 200 | HEALTHY |
 | /metrics | GET | 200 | OK (Prometheus) |
-| /api/metrics | GET | 500 | ERROR: `ss -tlnp 2>/dev/null` exit 127 |
+| /api/metrics | GET | 200 | OK (Prometheus) — score, ssh_failures, open_ports, temp_c, ram_percent |
 | /v1/models | GET | 200 | OK |
 | /v1/chat/completions | POST | 200 | ERROR: "Error ejecutando sec-agent" |
 
@@ -634,7 +634,11 @@ Realizar auditoría completa del sistema Orange Pi y del repositorio, verificar 
 
 #### Hallazgos de producción
 
-1. `/api/metrics` devuelve 500: PATH del servicio (`/root/edge-sec-agent/venv/bin`) no incluye `/usr/bin` donde está `ss`
+1. `/api/metrics` ahora retorna 200: el servicio systemd ya incluye `/usr/bin:/usr/local/bin` en PATH.
+
+2. Hallazgo previo: `/api/metrics` devolvía 500 porque PATH del servicio (`/root/edge-sec-agent/venv/bin`) no incluía `/usr/bin` donde está `ss`. **Solución**: se añadió `/usr/bin:/usr/local/bin` a la variable `Environment` en `/etc/systemd/system/edge-sec-agent.service` y se ejecutó `systemctl daemon-reload`.
+
+3. ...
 2. Chat endpoint devuelve error: `sec-agent` no está en PATH del servicio
 3. Jail `nginx-http-auth` no existe en Fail2Ban
 4. `sqlite3` no instalado — integridad de DB no verificable
@@ -786,7 +790,7 @@ Resultado: `{"choices":[{"message":{"content":"Error ejecutando sec-agent","role
 
 #### Hallazgos pendientes conocidos
 
-- `/api/metrics` devuelve 500: PATH del servicio no incluye `/usr/bin` donde está `ss`
+- `/api/metrics` ahora retorna 200: el servicio systemd ya incluye `/usr/bin:/usr/local/bin` en PATH.
 - Chat endpoint devuelve error: `sec-agent` no está en PATH del servicio
 - Jail `nginx-http-auth` no existe en Fail2Ban
 - `sqlite3` no instalado — integridad de DB no verificable
@@ -816,7 +820,7 @@ Resultado: `{"choices":[{"message":{"content":"Error ejecutando sec-agent","role
 | / | GET | 200 | OK |
 | /v1/global/health | GET | 200 | HEALTHY |
 | /metrics | GET | 200 | OK (Prometheus) |
-| /api/metrics | GET | 500 | ERROR: PATH service |
+| /api/metrics | GET | 200 | OK (Prometheus) — score, ssh_failures, open_ports, temp_c, ram_percent |
 | /v1/models | GET | 200 | OK |
 | /v1/chat/completions | POST | 200 | ERROR: "Error executing sec-agent" |
 
