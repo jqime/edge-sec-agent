@@ -4,12 +4,12 @@
 
 - Última sesión: 2026-10-10
 - Rama: chore/reconcile-agent-prompts
-- Último commit: bd72528
-- Estado del repositorio: cambios en AGENTS.md (documentación de sesión)
+- Último commit: 15b3a2b
+- Estado del repositorio: commit y push completados (chore/reconcile-agent-prompts)
 - Estado de la Orange Pi: VERIFICADA EN HARDWARE
 - Estado CI: NO VERIFICADO EN ESTE ENTORNO
 - Tests: 38 passed, coverage 52%
-- Riesgos abiertos: 4 hallazgos de producción documentados (ver sesión 2026-10-10)
+- Riesgos abiertos: 2 hallazgos de producción pendientes (firewall hardening, sec-agent comando chat) — documentados
 
 ---
 
