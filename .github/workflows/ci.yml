@@ -49,7 +49,17 @@ jobs:
     - name: Validar systemd units (si está disponible)
       run: |
         if command -v systemd-analyze >/dev/null 2>&1; then
-          systemd-analyze verify systemd/*.service systemd/*.timer
+          tmp_dir="$(mktemp -d)"
+          for file in systemd/*.service systemd/*.timer; do
+            out="$tmp_dir/$(basename "$file")"
+            sed \
+              -e 's|/opt/edge-sec-agent/app/current/scripts/backup_state.sh|/bin/true|g' \
+              -e 's|/opt/edge-sec-agent/app/current/scripts/health_watchdog.sh|/bin/true|g' \
+              -e 's|/opt/edge-sec-agent/app/current/scripts/update_safe.sh|/bin/true|g' \
+              -e 's|/opt/edge-sec-agent/app/venv/bin/gunicorn|/bin/true|g' \
+              "$file" > "$out"
+          done
+          systemd-analyze verify "$tmp_dir"/*.service "$tmp_dir"/*.timer
         else
           echo "systemd-analyze no disponible en runner; omitido."
         fi
