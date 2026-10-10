@@ -345,9 +345,9 @@ def api_metrics() -> tuple[Response, int]:
             "temp_c": temp,
             "ram_percent": ram,
         }), 200
-    except Exception as exc:
+    except Exception:
         logger.exception("Error en /api/metrics")
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": "internal_error"}), 500
 
 
 @app.route("/v1/models")
