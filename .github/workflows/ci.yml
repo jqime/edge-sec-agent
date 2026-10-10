@@ -35,3 +35,21 @@ jobs:
 
     - name: Validar sintaxis con Compileall
       run: python -m compileall src/
+
+    - name: Validar scripts Bash
+      run: |
+        for file in scripts/*; do
+          [ -f "$file" ] || continue
+          first_line="$(head -n 1 "$file" || true)"
+          if printf '%s' "$first_line" | grep -Eq 'bash|/bin/sh|/usr/bin/env bash|/usr/bin/env sh'; then
+            bash -n "$file"
+          fi
+        done
+
+    - name: Validar systemd units (si está disponible)
+      run: |
+        if command -v systemd-analyze >/dev/null 2>&1; then
+          systemd-analyze verify systemd/*.service systemd/*.timer
+        else
+          echo "systemd-analyze no disponible en runner; omitido."
+        fi
