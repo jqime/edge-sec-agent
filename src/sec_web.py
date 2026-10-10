@@ -197,7 +197,7 @@ def list_models() -> tuple[Response, int]:
 
 @app.route("/v1/chat/completions", methods=["POST"])
 def chat_completions() -> tuple[Response, int]:
-    """Endpoint compatible OpenAI — ejecuta sec-agent con el mensaje del usuario."""
+    """Endpoint compatible OpenAI — ejecuta sec-agent --security con el mensaje del usuario."""
     data = request.get_json(silent=True) or {}
     messages = data.get("messages", [])
     pregunta = ""
@@ -209,7 +209,7 @@ def chat_completions() -> tuple[Response, int]:
         pregunta = "estado"
     try:
         result = subprocess.run(
-            ["sec-agent", pregunta],
+            ["/root/edge-sec-agent/scripts/sec-agent", "--security", pregunta],
             capture_output=True,
             text=True,
             timeout=30,
