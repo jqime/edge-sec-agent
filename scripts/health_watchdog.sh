@@ -2,8 +2,7 @@
 set -euo pipefail
 
 HEALTH_URL="${EDGE_HEALTH_URL:-http://127.0.0.1:5000/v1/global/health}"
-SERVICE_NAME="${EDGE_SERVICE_NAME:-edge-sec-agent}"
-RESTART_CMD="${EDGE_RESTART_CMD:-systemctl restart $SERVICE_NAME}"
+SERVICE_NAME="edge-sec-agent"
 INSTALL_ROOT="${EDGE_INSTALL_ROOT:-/opt/edge-sec-agent}"
 DB_PATH="${EDGE_DB_PATH:-$INSTALL_ROOT/data/history.db}"
 
@@ -34,6 +33,5 @@ if check_http && check_db && check_ports; then
 fi
 
 logger -t edge-sec-agent-health "health watchdog: fallo detectado, reiniciando $SERVICE_NAME"
-# shellcheck disable=SC2086
-$RESTART_CMD
+systemctl restart "$SERVICE_NAME"
 exit 0
