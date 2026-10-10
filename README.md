@@ -142,3 +142,18 @@ edge-sec-agent/
 ---
 
 **Especificaciones de Entorno:** Hardware: Orange Pi Zero 3 (ARM64) | Sistema Operativo: DietPi v12 (Debian Bookworm) | Estado del Entorno: Producción Verificada.
+
+## 6. Operación reproducible y mantenible (nuevo)
+
+Para una ruta reproducible desde cero (bootstrap + systemd + backup/restore + update seguro), consulta:
+
+- `/docs/OPERATIONS.md`
+- `/docs/RECOVERY_RUNBOOK.md`
+
+Puntos clave:
+
+- despliegue idempotente en `/opt/edge-sec-agent`
+- separación de código/configuración/datos
+- backup con verificación de integridad SQLite
+- actualización segura opt-in con lock, health check y rollback
+- watchdog de salud que reinicia solo `edge-sec-agent`

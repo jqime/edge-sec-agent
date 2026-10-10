@@ -1,0 +1,9 @@
+[Unit]
+Description=Edge Sec Agent safe updater
+ConditionPathExists=/etc/edge-sec-agent/update.enabled
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=-/opt/edge-sec-agent/config/edge-sec-agent.env
+ExecStart=/opt/edge-sec-agent/app/current/scripts/update_safe.sh
