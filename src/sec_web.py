@@ -19,7 +19,8 @@ import threading
 import time
 from datetime import datetime
 from typing import Any
-from urllib import error, request as urllib_request
+from urllib import error
+from urllib import request as urllib_request
 
 from flask import Flask, Response, g, jsonify, request
 
