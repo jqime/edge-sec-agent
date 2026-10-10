@@ -142,3 +142,52 @@ edge-sec-agent/
 ---
 
 **Especificaciones de Entorno:** Hardware: Orange Pi Zero 3 (ARM64) | Sistema Operativo: DietPi v12 (Debian Bookworm) | Estado del Entorno: Producción Verificada.
+
+## 6. Operación reproducible y mantenible (nuevo)
+
+Para una ruta reproducible desde cero (bootstrap + systemd + backup/restore + update seguro), consulta:
+
+- `/docs/OPERATIONS.md`
+- `/docs/RECOVERY_RUNBOOK.md`
+
+Puntos clave:
+
+- despliegue idempotente en `/opt/edge-sec-agent`
+- separación de código/configuración/datos
+- backup con verificación de integridad SQLite
+- actualización segura opt-in con lock, health check y rollback
+- watchdog de salud que reinicia solo `edge-sec-agent`
+
+## 7. Limitaciones - Datos que NO se restauran desde Git
+
+**Clonar el repositorio o ejecutar bootstrap no restaura automáticamente:**
+
+- **Tailscale** y credenciales de red: es necesario autenticar `tailscale login` y configurar claves nuevamente.
+- **Certificados TLS** y claves privadas: deben restaurarse desde backup seguro o vuelto a emitir.
+- **Basic Auth** en Nginx (`/etc/nginx/.htpasswd`): credenciales que se deben configurar manualmente o restaurar desde backup.
+- **Modelos Ollama**: `tinyllama:1.1b` u otros modelos deben instalarse con `ollama pull` después del despliegue.
+- **Credenciales Git** y tokens: no se almacenan en el repositorio por seguridad.
+- **Configuración externa de Nginx**: reglas de rate limiting, IP whitelist, dominios adicionales.
+- **Claves SSH** de usuarios del sistema: deben gestionarse por el administrador del sistema.
+- **Datos de la base de SQLite** `history.db`: el schema se restaura desde Git, pero los datos insertados se pierden a menos que se respalden con `backup_state.sh`.
+
+**SÍ se restaura desde Git:**
+
+- Código fuente de `src/`, `scripts/`, `systemd/`
+- Schema y estructura de `history.db` (tablas, triggers)
+- Configuración de sistema no sensible (`EDGE_MODEL`, `EDGE_TIMEOUT`, etc. en `edge-sec-agent.env`)
+- Unidades de systemd y timers
+- Docs y configuración no sensible
+
+**Para restaurar todo el entorno:**
+
+1. Ejecutar bootstrap: `sudo ./scripts/bootstrap_debian_arm64.sh --channel stable`
+2. Restaurar backup: `sudo ./scripts/restore_state.sh /opt/edge-sec-agent/backups/<timestamp>`
+3. Configurar Tailscale: `tailscale login`
+4. Pull modelos Ollama: `ollama pull tinyllama:1.1b`
+5. Configurar credenciales Basic Auth: `htpasswd /etc/nginx/.htpasswd <usuario>`
+6. Verificar salud: `curl http://127.0.0.1:5000/v1/global/health`
+
+---
+
+**Especificaciones de Entorno:** Hardware: Orange Pi Zero 3 (ARM64) | Sistema Operativo: DietPi v12 (Debian Bookworm) | Estado del Entorno: Producción Verificada.

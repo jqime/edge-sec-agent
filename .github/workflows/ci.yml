@@ -35,3 +35,31 @@ jobs:
 
     - name: Validar sintaxis con Compileall
       run: python -m compileall src/
+
+    - name: Validar scripts Bash
+      run: |
+        for file in scripts/*; do
+          [ -f "$file" ] || continue
+          first_line="$(head -n 1 "$file" || true)"
+          if printf '%s' "$first_line" | grep -Eq 'bash|/bin/sh|/usr/bin/env bash|/usr/bin/env sh'; then
+            bash -n "$file"
+          fi
+        done
+
+    - name: Validar systemd units (si está disponible)
+      run: |
+        if command -v systemd-analyze >/dev/null 2>&1; then
+          tmp_dir="$(mktemp -d)"
+          for file in systemd/*.service systemd/*.timer; do
+            out="$tmp_dir/$(basename "$file")"
+            sed \
+              -e 's|/opt/edge-sec-agent/app/current/scripts/backup_state.sh|/bin/true|g' \
+              -e 's|/opt/edge-sec-agent/app/current/scripts/health_watchdog.sh|/bin/true|g' \
+              -e 's|/opt/edge-sec-agent/app/current/scripts/update_safe.sh|/bin/true|g' \
+              -e 's|/opt/edge-sec-agent/app/venv/bin/gunicorn|/bin/true|g' \
+              "$file" > "$out"
+          done
+          systemd-analyze verify "$tmp_dir"/*.service "$tmp_dir"/*.timer
+        else
+          echo "systemd-analyze no disponible en runner; omitido."
+        fi
