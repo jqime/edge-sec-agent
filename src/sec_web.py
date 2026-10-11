@@ -12,6 +12,7 @@ Endpoints:
 """
 import logging
 import os
+
 _REPORTS_DIR = os.path.dirname(os.path.dirname(__file__)) + "/reports"
 import re
 import sqlite3
@@ -387,8 +388,9 @@ def chat_completions() -> tuple[Response, int]:
             check=True,
         )
         respuesta = result.stdout.strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError):
-        respuesta = "Error ejecutando sec-agent"
+    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError) as e:
+        logger.error("Error executing sec-agent: %s", str(e))
+        respuesta = "Error executing sec-agent"
     return jsonify({
         "choices": [{"message": {"role": "assistant", "content": respuesta}}],
     }), 200
@@ -408,8 +410,9 @@ def ask() -> tuple[Response, int]:
             check=True,
         )
         respuesta = result.stdout.strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError):
-        respuesta = "Error ejecutando sec-agent"
+    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError) as e:
+        logger.error("Error executing sec-agent: %s", str(e))
+        respuesta = "Error executing sec-agent"
     return jsonify({"respuesta": respuesta}), 200
 
 
