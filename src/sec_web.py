@@ -18,6 +18,7 @@ import subprocess
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 from urllib import error
 from urllib import request as urllib_request
@@ -32,6 +33,10 @@ from src.agent import (
     _get_temperature_c,
 )
 from src.database import get_latest
+
+# Ruta derivada de forma relativa al modulo (no hardcodeada /root/...)
+_SCRIPT_DIR = str(Path(__file__).resolve().parent.parent / "scripts")
+_SECURE_AGENT_SCRIPT = f"{_SCRIPT_DIR}/sec-agent"
 
 logger = logging.getLogger("edge-sec-agent.web")
 app = Flask(__name__)
@@ -374,7 +379,7 @@ def chat_completions() -> tuple[Response, int]:
         pregunta = "estado"
     try:
         result = subprocess.run(
-            ["/root/edge-sec-agent/scripts/sec-agent", "--security", pregunta],
+            ["{sec_agent_script}", "--security", pregunta],
             capture_output=True,
             text=True,
             timeout=30,
@@ -395,7 +400,7 @@ def ask() -> tuple[Response, int]:
     pregunta = data.get("pregunta", "")
     try:
         result = subprocess.run(
-            ["sec-agent", pregunta],
+            ["{_SCRIPT_DIR}/sec-agent", pregunta],
             capture_output=True,
             text=True,
             timeout=30,
