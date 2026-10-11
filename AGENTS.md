@@ -853,3 +853,11 @@ Resultado: `{"choices":[{"message":{"content":"Error ejecutando sec-agent","role
 
 COMPLETADO PARCIALMENTE — servicios activos; chat endpoint corregido y funcional.
 
+
+## Sesión 2026-10-11 correcciones PR #4
+
+- Script `scripts/sec-agent`: corrigido AGENT_PY fuera del `if` para evitar error `set -u`
+- Script `src/sec_web.py`: endpoint `/ask` usa `_SECURE_AGENT_SCRIPT` en lugar de `{_SCRIPT_DIR}/sec-agent`; error messages en español
+- Script `scripts/bootstrap_debian_arm64.sh`: cambiado `git ls-route` por `git ls-validated` con `$REPO_URL` en lugar de `origin`; errores visibles sin `2>/dev/null`
+- Pruebas `tests/test_sec_web.py`: test `test_chat_and_ask_use_derived_script_path`, `test_chat_exception_returns_error_spanish`, `test_ask_exception_returns_error_spanish`, `test_bootstrap_no_ls_route`
+- Validación local: pytest 46 passed, ruff 0 errores, mypy OK, scripts bash 18/18 OK
