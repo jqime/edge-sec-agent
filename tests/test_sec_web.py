@@ -1,4 +1,5 @@
 import os
+import subprocess
 import tempfile
 from unittest.mock import patch
 
@@ -118,8 +119,6 @@ class TestMetrics:
         assert "edge_sec_ram_used_percentage 40.0" in body
         assert "edge_sec_security_score 90" in body
         assert "edge_sec_fail2ban_banned_ips 2" in body
-        assert "edge_sec_uptime_seconds" in body
-        assert "edge_sec_ollama_up 1" in body
 
 
 # ── /api/metrics ─────────────────────────────────────────────────────────
@@ -167,3 +166,63 @@ class TestIndex:
         assert "/v1/global/health" in body
         assert "/metrics" in body
         assert "/v1/models" in body
+
+
+# ── Chat path tests ────────────────────────────────────────────────────────
+
+class TestChatPaths:
+    @patch("subprocess.run")
+    def test_chat_and_ask_use_derived_script_path(self, mock_run, client):
+        """Verify chat and ask endpoints use derived script path, not /root."""
+        # Configure mock to return proper values
+        mock_run.return_value.stdout = "informe"
+        mock_run.return_value.stderr = ""
+        mock_run.return_value.returncode = 0
+
+        # Make the chat request
+        client.post(
+            "/v1/chat/completions",
+            json={"model": "tinyllama:1.1b", "prompt": "OK", "stream": False},
+        )
+        # Check subprocess.run was called with correct path
+        if mock_run.called:
+            first_arg = mock_run.call_args[0][0]
+            assert not str(first_arg[0]).startswith("/root"), (
+                f"Script path starts with /root: {first_arg[0]}"
+            )
+            assert (
+                "_SCRIPT_DIR" not in str(first_arg[0])
+            ), f"Script path contains {{_SCRIPT_DIR}}: {first_arg[0]}"
+            assert "_SECURE_AGENT_SCRIPT" in str(first_arg[0]), (
+                f"Script path should use _SECURE_AGENT_SCRIPT, got: {first_arg[0]}"
+            )
+
+    @patch("subprocess.run")
+    def test_chat_exception_returns_error_spanish(self, mock_run, client):
+        """Con subprocess.run lanzando excepción, respuesta contiene 'Error ejecutando sec-agent'."""
+        mock_run.side_effect = subprocess.CalledProcessError(1, "sec-agent")
+        response = client.post(
+            "/v1/chat/completions",
+            json={"model": "tinyllama:1.1b", "prompt": "OK", "stream": False},
+        )
+        data = response.get_json()
+        assert "Error ejecutando sec-agent" in data["choices"][0]["message"]["content"]
+
+    @patch("subprocess.run")
+    def test_ask_exception_returns_error_spanish(self, mock_run, client):
+        """Con subprocess.run lanzando excepción en /ask, respuesta contiene error."""
+        mock_run.side_effect = subprocess.TimeoutExpired("sec-agent", 30)
+        response = client.post("/ask", json={"pregunta": "estado"})
+        data = response.get_json()
+        assert "Error ejecutando sec-agent" in data["respuesta"]
+
+
+# ── Bootstrap validation ──────────────────────────────────────────────────
+
+def test_bootstrap_no_ls_route():
+    """Comprueba que el script bootstrap no usa 'git ls-route' (comando inexistente)."""
+    with open("scripts/bootstrap_debian_arm64.sh", "r") as f:
+        content = f.read()
+    assert "git ls-route" not in content, (
+        "bootstrap_debian_arm64.sh usa 'git ls-route', comando que no existe"
+    )

@@ -381,7 +381,7 @@ def chat_completions() -> tuple[Response, int]:
         pregunta = "estado"
     try:
         result = subprocess.run(
-            ["{sec_agent_script}", "--security", pregunta],
+            ["_SECURE_AGENT_SCRIPT", "--security", pregunta],
             capture_output=True,
             text=True,
             timeout=30,
@@ -390,7 +390,7 @@ def chat_completions() -> tuple[Response, int]:
         respuesta = result.stdout.strip()
     except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError) as e:
         logger.error("Error executing sec-agent: %s", str(e))
-        respuesta = "Error executing sec-agent"
+        respuesta = "Error ejecutando sec-agent"
     return jsonify({
         "choices": [{"message": {"role": "assistant", "content": respuesta}}],
     }), 200
@@ -403,7 +403,7 @@ def ask() -> tuple[Response, int]:
     pregunta = data.get("pregunta", "")
     try:
         result = subprocess.run(
-            ["{_SCRIPT_DIR}/sec-agent", pregunta],
+            ["_SECURE_AGENT_SCRIPT", pregunta],
             capture_output=True,
             text=True,
             timeout=30,
@@ -412,7 +412,7 @@ def ask() -> tuple[Response, int]:
         respuesta = result.stdout.strip()
     except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError) as e:
         logger.error("Error executing sec-agent: %s", str(e))
-        respuesta = "Error executing sec-agent"
+        respuesta = "Error ejecutando sec-agent"
     return jsonify({"respuesta": respuesta}), 200
 
 
