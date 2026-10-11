@@ -74,10 +74,34 @@ def test_update_script_blocks_main_without_explicit_override():
 
 def test_health_watchdog_restart_path_is_safe_with_mock_restart(tmp_path: Path):
     script = _repo_root() / "scripts/health_watchdog.sh"
+
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    call_log = tmp_path / "systemctl-calls.log"
+
+    mock_systemctl = bin_dir / "systemctl"
+    mock_systemctl.write_text(
+        "#!/usr/bin/env bash\n"
+        'printf "%s\\n" "$*" > "$MOCK_SYSTEMCTL_LOG"\n'
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    mock_systemctl.chmod(0o755)
+
     env = os.environ.copy()
     env["EDGE_HEALTH_URL"] = "http://127.0.0.1:9/unreachable"
-    env["EDGE_RESTART_CMD"] = "/bin/true"
     env["EDGE_DB_PATH"] = str(tmp_path / "missing.db")
+    env["PATH"] = f"{bin_dir}{os.pathsep}{env.get('PATH', '')}"
+    env["MOCK_SYSTEMCTL_LOG"] = str(call_log)
+    env.pop("EDGE_RESTART_CMD", None)
 
     result = subprocess.run([str(script)], env=env, capture_output=True, text=True, check=False)
-    assert result.returncode == 0
+    assert result.returncode == 0, result.stderr
+
+    assert call_log.exists(), "mock systemctl no fue invocado"
+    calls = call_log.read_text(encoding="utf-8").splitlines()
+    assert calls == ["restart edge-sec-agent"], f"argumentos inesperados: {calls}"
+
+    script_content = script.read_text(encoding="utf-8")
+    for forbidden in ("EDGE_RESTART_CMD", "$RESTART_CMD", "eval", "bash -c", "sh -c"):
+        assert forbidden not in script_content, f"prohibido en watchdog: {forbidden}"
