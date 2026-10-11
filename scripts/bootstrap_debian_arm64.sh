@@ -53,6 +53,16 @@ if [[ "$ARCH" != "aarch64" && "$ARCH" != "arm64" ]]; then
   if [[ "$DRY_RUN" -eq 0 ]]; then exit 1; fi
 fi
 
+
+# Validate channel exists in remote using ls-remote (not ls-route, which doesn't exist)
+if git ls-remote --exit-code "$REPO_URL" "refs/heads/$CHANNEL" >/dev/null 2>&1; then
+    echo "Canal $CHANNEL existe en $REPO_URL (heads)"
+elif git ls-remote --exit-code "$REPO_URL" "refs/tags/$CHANNEL" >/dev/null 2>&1; then
+    echo "Canal $CHANNEL existe en $REPO_URL (tags)"
+else
+    echo "Canal $CHANNEL no existe en $REPO_URL (ni heads ni tags)." >&2
+    exit 1
+fi
 if [[ -r /etc/os-release ]]; then
   . /etc/os-release
 else
