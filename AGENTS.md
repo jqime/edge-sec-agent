@@ -2,76 +2,14 @@
 
 ## Estado actual
 
-- Última sesión: 2026-10-11
-- Rama: copilot/design-reproducible-platform
-- Último commit: e9193d9
-- Estado del repositorio: commit y push completados (copilot/design-reproducible-platform)
+- Última sesión: 2026-10-10
+- Rama: chore/reconcile-agent-prompts
+- Último commit: 15b3a2b
+- Estado del repositorio: commit y push completados (chore/reconcile-agent-prompts)
 - Estado de la Orange Pi: VERIFICADA EN HARDWARE
-- Estado CI: EJECUTADO Y CORREGIDO (PR #4)
-- Tests: 42 passed
-- Despliegue staging paralelo: VERIFICADO en /opt/edge-sec-agent-staging
-
----
-
-## Registro de sesiones
-
-### Sesión 2026-10-11 — Despliegue staging paralelo del PR #4
-
-#### Objetivo
-
-Desplegar el PR #4 en paralelo sin afectar producción, validar endpoints y operaciones, y documentar el resultado.
-
-#### Estado inicial
-
-- Producción: /root/edge-sec-agent, rama chore/reconcile-agent-prompts, commit c0bdd4b + fixes
-- PR: copilot/design-reproducible-platform, commit e9193d9
-- Worktree seguro: /root/edge-sec-agent-pr4
-- Producción HEALTHY en 127.0.0.1:5000
-
-#### Backup pre-despliegue
-
-- Directorio: /var/backups/edge-sec-agent/pre-pr4-20261011-102957
-- Contenido: edge-sec-agent.service, iptables.rules, ip6tables.rules, data/ (copia de /root/edge-sec-agent/data)
-
-#### Despliegue staging
-
-- Clonado del PR en /opt/edge-sec-agent-staging
-- venv creado en /opt/edge-sec-agent-staging/venv
-- Unidad staging generada con sed desde systemd/edge-sec-agent.service del PR:
-  - Description: Edge Sec Agent - Staging (PR #4)
-  - Puerto: 5001
-  - Rutas: /opt/edge-sec-agent-staging
-  - Hardening conservado (NoNewPrivileges, PrivateTmp, ProtectSystem, ProtectHome)
-  - EnvironmentFile: /opt/edge-sec-agent-staging/config/edge-sec-agent.env
-- Servicio: edge-sec-agent-staging.service, activo, usuario edgesec
-
-#### Validaciones staging
-
-| Test | Resultado |
-|---|---|
-| /v1/global/health | HEALTHY |
-| /metrics | OK |
-| /api/metrics | OK (score, ssh_failures, open_ports, temp_c, ram_percent) |
-| /v1/models | OK |
-| /v1/chat/completions | Error ejecutando sec-agent (limitación conocida: sec-agent no en PATH staging) |
-| backup_state.sh | OK |
-| restore_state.sh | OK (integrity_check OK) |
-| update_safe.sh --dry-run --channel stable | Fallo: Canal remoto origin/stable no existe (exit 1) |
-
-#### Limitaciones documentadas
-
-- health_watchdog.sh del PR está hardcodeado a edge-sec-agent (producción). No se ejecutó contra producción.
-- bootstrap_debian_arm64.sh real: NO VERIFICADO (solo dry-run). Para probarlo en paralelo harían falta parámetros --service-name y --port.
-- Canal stable no existe en remoto.
-
-#### Producción durante el despliegue
-
-- edge-sec-agent: active, HEALTHY en 127.0.0.1:5000
-- Sin cambios en /etc/nginx, firewall, Tailscale, Dropbear, Ollama
-
-#### Estado final
-
-COMPLETADO — staging paralelo desplegado y validado; producción intacta; bootstrap real NO VERIFICADO
+- Estado CI: NO VERIFICADO EN ESTE ENTORNO
+- Tests: 38 passed, coverage 52%
+- Riesgos abiertos: 2 hallazgos de producción pendientes (firewall hardening, sec-agent comando chat) — documentados
 
 ---
 
@@ -914,17 +852,4 @@ Resultado: `{"choices":[{"message":{"content":"Error ejecutando sec-agent","role
 #### Estado final
 
 COMPLETADO PARCIALMENTE — servicios activos; chat endpoint corregido y funcional.
-
-#### Sesión staging PR #4
-
-- Despliegue staging en `/opt/edge-sec-agent-staging` (unidad `edge-sec-agent-staging.service`, puerto 5001)
-- Producción `/root/edge-sec-agent` en `chore/reconcile-agent-prompts` (puerto 5000, `edge-sec-agent.service`)
-- Endpoints staging validadas: `/v1/global/health` → HEALTHY, `/metrics` → OK, `/api/metrics` → OK, `/v1/models` → OK
-- `/v1/chat/completions` en staging: error "Error ejecutando sec-agent" (limitación conocida: `sec-agent` no en PATH staging)
-- `update_safe.sh --dry-run --channel stable` → "Canal remoto origin/stable no existe" (exit 1)
-- `bootstrap_debian_arm64.sh --dry-run` → válido; no modifica producción; para probar en paralelo se necesitan `--service-name` y `--port`
-- `health_watchdog.sh` → hardcodeado a `edge-sec-agent` (producción); no se ejecutó contra producción
-- **LO NO VERIFICADO**: rollback simulado de `update_safe.sh` en staging, watchdog con mock de `systemctl` en PATH (nunca contra servicio real)
-- Sin merge, sin push a `main`, sin modificar producción, nginx, firewall, Tailscale, Dropbear, Ollama
-- Sin secretos ni credenciales en el registro
 
