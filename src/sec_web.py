@@ -12,6 +12,7 @@ Endpoints:
 """
 import logging
 import os
+_REPORTS_DIR = os.path.dirname(os.path.dirname(__file__)) + "/reports"
 import re
 import sqlite3
 import subprocess
