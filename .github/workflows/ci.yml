@@ -2,9 +2,14 @@ name: Edge Agent CI Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - chore/reconcile-agent-prompts
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
+      - chore/reconcile-agent-prompts
+  workflow_dispatch:
 
 jobs:
   lint-and-validate:
