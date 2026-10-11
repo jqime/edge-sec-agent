@@ -27,6 +27,16 @@ def client():
         yield c
 
 
+@pytest.fixture(autouse=True)
+def _stable_dependencies():
+    with (
+        patch("src.sec_web._check_ollama", return_value={"ok": True, "latency_ms": 1.0}),
+        patch("src.sec_web._check_sqlite", return_value={"ok": True, "detail": "ok", "latency_ms": 1.0}),
+        patch("src.sec_web._last_update_info", return_value={"updated_at": None, "commit": "abc", "channel": "stable"}),
+    ):
+        yield
+
+
 # ── /v1/global/health ────────────────────────────────────────────────────
 
 class TestHealth:
@@ -108,6 +118,8 @@ class TestMetrics:
         assert "edge_sec_ram_used_percentage 40.0" in body
         assert "edge_sec_security_score 90" in body
         assert "edge_sec_fail2ban_banned_ips 2" in body
+        assert "edge_sec_uptime_seconds" in body
+        assert "edge_sec_ollama_up 1" in body
 
 
 # ── /api/metrics ─────────────────────────────────────────────────────────
