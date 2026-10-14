@@ -1,0 +1,26 @@
+[Unit]
+Description=Edge Sec Agent - Gunicorn API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=edgesec
+Group=edgesec
+WorkingDirectory=/opt/edge-sec-agent/app/current
+EnvironmentFile=-/opt/edge-sec-agent/config/edge-sec-agent.env
+Environment=PATH=/opt/edge-sec-agent/app/venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/edge-sec-agent/app/venv/bin/gunicorn --bind 127.0.0.1:5000 --workers 2 --timeout 120 wsgi:app
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=45
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/edge-sec-agent/data /opt/edge-sec-agent/reports /opt/edge-sec-agent/backups /opt/edge-sec-agent/logs
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target
