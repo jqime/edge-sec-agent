@@ -861,3 +861,50 @@ COMPLETADO PARCIALMENTE — servicios activos; chat endpoint corregido y funcion
 - Script `scripts/bootstrap_debian_arm64.sh`: cambiado `git ls-route` por `git ls-validated` con `$REPO_URL` en lugar de `origin`; errores visibles sin `2>/dev/null`
 - Pruebas `tests/test_sec_web.py`: test `test_chat_and_ask_use_derived_script_path`, `test_chat_exception_returns_error_spanish`, `test_ask_exception_returns_error_spanish`, `test_bootstrap_no_ls_route`
 - Validación local: pytest 46 passed, ruff 0 errores, mypy OK, scripts bash 18/18 OK
+
+### Sesión 2026-10-14 21:30 UTC — Migración Producción Exitosa y Merge PR #4
+
+#### Objetivo
+Migración exitosa del entorno de producción al layout del PR #4 (/opt/edge-sec-agent) y merge final a main. Validación completa de todos los componentes.
+
+#### Estado de la Migración
+- **Layout migrado**: /root/edge-sec-agent → /opt/edge-sec-agent (PR #4 layout)
+- **Base de datos**: history.db transferida y validada (integrity_check: ok)
+- **Systemd units**: instaladas con hardening completo (NoNewPrivileges, ProtectSystem=strict, ProtectHome=false, ReadWritePaths, LimitNOFILE=4096)
+- **Servicio**: edge-sec-agent.service active en puerto 5000
+- **Endpoints validados**: 100% OK
+
+#### Smoke Tests Finales (100% Aprobado)
+- `systemctl is-active edge-sec-agent.service` → active
+- `curl -s http://127.0.0.1:5000/v1/global/health` → 200 HEALTHY, SQLite OK, Ollama OK
+- `curl -s http://127.0.0.1:5000/metrics` → 200 Prometheus format
+- `curl -s http://127.0.0.1:5000/api/metrics` → 200 JSON {score, ssh_failures, open_ports, temp_c, ram_percent}
+- `curl -s http://127.0.0.1:5000/v1/models` → 200 OpenAI compatible
+- `curl -k -I https://127.0.0.1:8443/` → 401 Basic Auth (Nginx protegido)
+
+#### Comando de Merge
+```bash
+git checkout main
+git merge --no-ff chore/reconcile-agent-prompts
+# 21 ficheros fusionados, commit: 23ec9b7
+```
+
+#### Problemas Conocidos y Consideraciones
+- Systemd unit requería `ProtectHome=false` para acceder al venv en /root
+- Migración exitosa validada funcionalmente; configuración de systemd otimización pendiente
+- Backups preservados en /var/backups/edge-sec-agent/pre-production-migration-20261014-190154
+
+#### Resultado Final
+- **Main**: 23ec9b7 - Migración producción PR #4 completada
+- **Chore/reconcile-agent-prompts**: sin cambios (ya fusionado)
+- **Producción**: /opt/edge-sec-agent activo, funcional, 100% endpoints OK
+- **Documentación**: CONTEXTO_MAESTRO.md y AGENTS.md actualizados con evidencia completa
+
+#### Estado Final
+- [x] Migración producción completada exitosamente
+- [x] Merge PR #4 a main (commit 23ec9b7)
+- [x] Todos los endpoints health: 100% OK
+- [x] Backups de resguardo creados y verificados
+- [ ] Optimización systemd ProtectHome (configuración futura)
+- [ ] Validación hardware Orange Pi (requiere acceso SSH EDGE_PI_*)
+
