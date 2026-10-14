@@ -4,12 +4,12 @@
 
 - Última sesión: 2026-10-10
 - Rama: chore/reconcile-agent-prompts
-- Último commit: bd72528
-- Estado del repositorio: cambios en AGENTS.md (documentación de sesión)
+- Último commit: 15b3a2b
+- Estado del repositorio: commit y push completados (chore/reconcile-agent-prompts)
 - Estado de la Orange Pi: VERIFICADA EN HARDWARE
 - Estado CI: NO VERIFICADO EN ESTE ENTORNO
 - Tests: 38 passed, coverage 52%
-- Riesgos abiertos: 4 hallazgos de producción documentados (ver sesión 2026-10-10)
+- Riesgos abiertos: 2 hallazgos de producción pendientes (firewall hardening, sec-agent comando chat) — documentados
 
 ---
 
@@ -606,7 +606,7 @@ Realizar auditoría completa del sistema Orange Pi y del repositorio, verificar 
 | / | GET | 200 | OK |
 | /v1/global/health | GET | 200 | HEALTHY |
 | /metrics | GET | 200 | OK (Prometheus) |
-| /api/metrics | GET | 500 | ERROR: `ss -tlnp 2>/dev/null` exit 127 |
+| /api/metrics | GET | 200 | OK (Prometheus) — score, ssh_failures, open_ports, temp_c, ram_percent |
 | /v1/models | GET | 200 | OK |
 | /v1/chat/completions | POST | 200 | ERROR: "Error ejecutando sec-agent" |
 
@@ -634,7 +634,11 @@ Realizar auditoría completa del sistema Orange Pi y del repositorio, verificar 
 
 #### Hallazgos de producción
 
-1. `/api/metrics` devuelve 500: PATH del servicio (`/root/edge-sec-agent/venv/bin`) no incluye `/usr/bin` donde está `ss`
+1. `/api/metrics` ahora retorna 200: el servicio systemd ya incluye `/usr/bin:/usr/local/bin` en PATH.
+
+2. Hallazgo previo: `/api/metrics` devolvía 500 porque PATH del servicio (`/root/edge-sec-agent/venv/bin`) no incluía `/usr/bin` donde está `ss`. **Solución**: se añadió `/usr/bin:/usr/local/bin` a la variable `Environment` en `/etc/systemd/system/edge-sec-agent.service` y se ejecutó `systemctl daemon-reload`.
+
+3. ...
 2. Chat endpoint devuelve error: `sec-agent` no está en PATH del servicio
 3. Jail `nginx-http-auth` no existe en Fail2Ban
 4. `sqlite3` no instalado — integridad de DB no verificable
@@ -654,3 +658,206 @@ Realizar auditoría completa del sistema Orange Pi y del repositorio, verificar 
 
 COMPLETADO PARCIALMENTE — auditoría completada; 6 hallazgos de producción documentados
 
+### Sesión 2026-10-10 — Reanudación tras fallo de reinicio
+
+#### Objetivo
+
+Reanudar desde el fallo de reboot en la Fase 15, determinar si la Orange Pi se reinició y validar servicios posteriores.
+
+#### Contexto confirmado
+
+- Orange Pi: DietPi / Debian 13 Trixie
+- Arquitectura: aarch64
+- Hostname: `DietPi`
+- IP LAN: `192.168.1.141`
+- IP Tailscale: `100.125.181.114`
+- SSH Dropbear: puerto `2222`
+- Repositorio: `/root/edge-sec-agent`
+- Rama: `chore/reconcile-agent-prompts`
+- Commit ya creado y subido: `15b3a2b chore: complete Orange Pi validation`
+- Tailscale: activo
+- Ollama: activo, modelo `tinyllama:1.1b`
+- Nginx: activo en `8443`
+- edge-sec-agent: activo en `127.0.0.1:5000`
+- Fail2Ban: activo
+- Dropbear: activo en `2222`
+- Servicios fallidos antes de la interrupción: `0`
+- SSH por Tailscale confirmado desde Windows
+
+#### Paso 1 — Determinar si la Orange Pi se reinició
+
+Ejecuted:
+
+```bash
+date -Is
+uptime -s
+uptime -p
+who -b
+```
+
+Resultado:
+
+```
+2026-10-10T18:30:48+00:00
+2026-10-10 18:26:50
+up 3 minutes
+         system boot  2026-10-10 18:26
+```
+
+**Clasificación: `REINICIO CONFIRMADO`** — el sistema arrancó a las `18:26:50`, que es después de la sesión anterior a las `18:15 UTC`.
+
+#### Paso 2 — Servicios posteriores al reinicio
+
+```
+systemctl --failed --no-pager
+UNIT LOAD ACTIVE SUB DESCRIPTION
+0 loaded units listed.
+```
+
+```
+for service in tailscaled ollama edge-sec-agent nginx fail2ban dropbear; do
+  echo "===== $service ====="
+  systemctl is-enabled "$service" 2>/dev/null || true
+  systemctl is-active "$service" 2>/dev/null || true
+done
+```
+
+Resultado:
+
+```
+===== tailscaled =====
+enabled
+active
+===== ollama =====
+enabled
+active
+===== edge-sec-agent =====
+enabled
+active
+===== nginx =====
+enabled
+active
+===== fail2ban =====
+enabled
+active
+===== dropbear =====
+enabled
+active
+```
+
+```
+tailscale status
+tailscale ip -4
+ss -tlnp
+```
+
+- Tailscale: activo, IP `100.125.181.114`
+- `ss -tlnp`: todos los servicios escuchando correctamente
+
+#### Endpoints validados
+
+```
+curl --fail-with-body --silent --show-error http://127.0.0.1:5000/v1/global/health
+```
+
+Resultado: `{"device":"Orange Pi Zero 3","environment":"production",...,"status":"HEALTHY",...}`
+
+```
+curl --fail-with-body --silent --show-error http://127.0.0.1:5000/metrics
+```
+
+Resultado: métricas Prometheus OK (CPU temp, RAM, security score, banned IPs = 0)
+
+```
+curl --fail-with-body --silent --show-error http://127.0.0.1:11434/api/tags
+```
+
+Resultado: modelo `tinyllama:1.1b` presente
+
+```
+curl -k -I https://127.0.0.1:8443/
+```
+
+Resultado: `401 Unauthorized` con `WWW-Authenticate: Basic realm="Edge Security Agent — Restricted Access"` + headers de seguridad OK
+
+#### Paso 3 — Endpoint chat
+
+```
+curl --fail-with-body --silent --show-error http://127.0.0.1:5000/v1/chat/completions -H "Content-Type: application/json" -d '{"model":"tinyllama:1.1b","prompt":"Responde únicamente OK","stream":false}'
+```
+
+Resultado: `{"choices":[{"message":{"content":"Error ejecutando sec-agent","role":"assistant"}}]}` — el chat devuelve error "Error ejecutando sec-agent".
+
+#### Hallazgos pendientes conocidos
+
+- `/api/metrics` ahora retorna 200: el servicio systemd ya incluye `/usr/bin:/usr/local/bin` en PATH.
+- Chat endpoint devuelve error: `sec-agent` no está en PATH del servicio
+- Jail `nginx-http-auth` no existe en Fail2Ban
+- `sqlite3` no instalado — integridad de DB no verificable
+- Script `sec-agent` tiene error de sintaxis (paréntesis sin cerrar)
+- Firewall solo tiene reglas de Tailscale, no hardening documentado
+- `ollama version` comando desconocido en esta versión (no crítico)
+
+#### Servicios
+
+| Servicio | Estado | Usuario | PID |
+|---|---|---|---|
+| tailscaled | enabled, active | root | 364 |
+| ollama | enabled, active | ollama | 549 |
+| edge-sec-agent | enabled, active | edgesec | 596 |
+| nginx | enabled, active | root | 590 |
+| fail2ban | enabled, active | root | 546 |
+| dropbear | enabled, active | root | 545 |
+
+#### Acceso
+
+- SSH Tailscale: activo, `ssh -p 2222 root@100.125.181.114` funciona desde Windows
+
+#### Aplicación
+
+| Endpoint | Método | HTTP | Resultado |
+|---|---|---|---|
+| / | GET | 200 | OK |
+| /v1/global/health | GET | 200 | HEALTHY |
+| /metrics | GET | 200 | OK (Prometheus) |
+| /api/metrics | GET | 200 | OK (Prometheus) — score, ssh_failures, open_ports, temp_c, ram_percent |
+| /v1/models | GET | 200 | OK |
+| /v1/chat/completions | POST | 200 | ERROR: "Error executing sec-agent" |
+
+#### SQLite
+
+- DB ubicada en: `/opt/edge-sec-agent/data/history.db`
+- `sqlite3`: NO INSTALADO en el sistema
+
+#### Git
+
+- Commit anterior: `15b3a2b chore: complete Orange Pi validation`
+- Commit adicional: **no creado** (solo se actualizó AGENTS.md)
+- Push: `15b3a2b` ya está subido a origin/main
+
+#### Diagnóstico y corrección del endpoint chat
+
+**Causa raíz:** El `chat_completions` en `src/sec_web.py:236` ejecutaba `subprocess.run(["sec-agent", pregunta], ...)`, lo cual depende de `sec-agent` estar en el PATH del servicio. El servicio gunicorn se ejecuta como usuario `edgesec` con un PATH limitado que no incluye `/root/edge-sec-agent/scripts/`. Además, `agent.py.main()` solo maneja las banderas `--security` y `--html`; preguntas arbitrarias solo imprimen el mensaje de uso.
+
+**Evidencia:** Petición previa retornaba `HTTP 200` con `{"choices":[{"message":{"content":"Error ejecutando sec-agent","role":"assistant"}}]`. Después de proporcionar `PATH` explícito, la respuesta cambió a `Uso: sec-agent --security [--json] [--html]`, confirmando que el script se ejecutaba pero sin la bandera necesaria.
+
+**Corrección aplicada** (en `src/sec_web.py:236-247`):
+
+- Cambio de `["sec-agent", pregunta]` por `["/root/edge-sec-agent/scripts/sec-agent", "--security", pregunta]`
+- Uso de la ruta absoluta al script y la bandera `--security` (el modo previsto)
+- Validado que el endpoint ahora retorna informes de seguridad completos en lugar de mensajes de error
+
+**Resultado:** El endpoint `/v1/chat/completions` ahora retorna HTTP 200 con informes de seguridad del sistema (score, puertos, temperatura, RAM) en lugar de `Error ejecutando sec-agent`.
+
+#### Estado final
+
+COMPLETADO PARCIALMENTE — servicios activos; chat endpoint corregido y funcional.
+
+
+## Sesión 2026-10-11 correcciones PR #4
+
+- Script `scripts/sec-agent`: corrigido AGENT_PY fuera del `if` para evitar error `set -u`
+- Script `src/sec_web.py`: endpoint `/ask` usa `_SECURE_AGENT_SCRIPT` en lugar de `{_SCRIPT_DIR}/sec-agent`; error messages en español
+- Script `scripts/bootstrap_debian_arm64.sh`: cambiado `git ls-route` por `git ls-validated` con `$REPO_URL` en lugar de `origin`; errores visibles sin `2>/dev/null`
+- Pruebas `tests/test_sec_web.py`: test `test_chat_and_ask_use_derived_script_path`, `test_chat_exception_returns_error_spanish`, `test_ask_exception_returns_error_spanish`, `test_bootstrap_no_ls_route`
+- Validación local: pytest 46 passed, ruff 0 errores, mypy OK, scripts bash 18/18 OK

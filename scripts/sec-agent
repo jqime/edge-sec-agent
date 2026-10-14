@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
-AGENT_PY="/root/edge-sec-agent/src/agent.py"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+AGENT_PY="$SCRIPT_DIR/../src/agent.py"
 if [[ "$*" =~ (^|[[:space:]])(--security|--json|--html)([[:space:]]|$) ]]; then
     exec python3 "$AGENT_PY" "$@"
 fi
