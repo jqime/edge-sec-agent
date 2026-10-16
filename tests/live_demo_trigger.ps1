@@ -7,9 +7,16 @@ $TargetIP    = "192.168.1.141"
 $TargetPort  = "8443"
 $URL         = "https://$($TargetIP):$($TargetPort)/v1/global/health"
 $ValidUser   = "admin"
-$ValidPass   = "REDACTED"
+# La contraseña NO debe hardcodearse en el repositorio: se lee de la variable
+# de entorno BASIC_AUTH_PASS (defínela antes de ejecutar el script).
+$ValidPass   = $env:BASIC_AUTH_PASS
 $InvalidPass = "ClaveIncorrecta"
 $MaxAttempts = 4
+
+if ([string]::IsNullOrEmpty($ValidPass)) {
+    Write-Host "[ERROR] BASIC_AUTH_PASS no está definida. Abortando para no exponer credenciales." -ForegroundColor Red
+    Exit 1
+}
 
 Clear-Host
 Write-Host "======================================================================" -ForegroundColor Cyan
