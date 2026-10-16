@@ -27,7 +27,11 @@ logger = logging.getLogger("edge-sec-agent.agent")
 MODEL = os.environ.get("EDGE_MODEL", "tinyllama:1.1b")
 MAX_TOKENS = int(os.environ.get("EDGE_MAX_TOKENS", "120"))
 HTTP_TIMEOUT = int(os.environ.get("EDGE_TIMEOUT", "180"))
-REPORTS_DIR = os.environ.get("REPORTS_DIR", "/root/edge-sec-agent/reports")
+REPORTS_DIR = (
+    os.environ.get("REPORTS_DIR")
+    or os.environ.get("EDGE_REPORTS_DIR")
+    or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reports")
+)
 
 SECRETS_PATH = "/root/edge-sec-agent/secrets.env"
 if os.path.exists(SECRETS_PATH):

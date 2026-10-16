@@ -170,32 +170,50 @@ class TestIndex:
 
 # ── Chat path tests ────────────────────────────────────────────────────────
 
+def _assert_real_script(args):
+    """Comprueba que el primer argumento es la ruta real y ejecutable de sec-agent."""
+    script = args[0]
+    assert script != "_SECURE_AGENT_SCRIPT", "se está usando el literal en vez de la variable"
+    assert os.path.isabs(script), f"la ruta no es absoluta: {script}"
+    assert not script.startswith("/root"), f"la ruta apunta a /root: {script}"
+    assert os.path.basename(script) == "sec-agent", f"basename inesperado: {script}"
+    assert os.path.exists(script), f"la ruta no existe: {script}"
+    assert os.access(script, os.X_OK), f"la ruta no es ejecutable: {script}"
+
+
 class TestChatPaths:
     @patch("subprocess.run")
-    def test_chat_and_ask_use_derived_script_path(self, mock_run, client):
-        """Verify chat and ask endpoints use derived script path, not /root."""
-        # Configure mock to return proper values
+    def test_chat_uses_real_script_path(self, mock_run, client):
+        """El endpoint debe usar la ruta real y ejecutable de sec-agent (no un literal)."""
         mock_run.return_value.stdout = "informe"
         mock_run.return_value.stderr = ""
         mock_run.return_value.returncode = 0
 
-        # Make the chat request
-        client.post(
+        resp = client.post(
             "/v1/chat/completions",
-            json={"model": "tinyllama:1.1b", "prompt": "OK", "stream": False},
+            json={"messages": [{"role": "user", "content": "estado"}]},
         )
-        # Check subprocess.run was called with correct path
-        if mock_run.called:
-            first_arg = mock_run.call_args[0][0]
-            assert not str(first_arg[0]).startswith("/root"), (
-                f"Script path starts with /root: {first_arg[0]}"
-            )
-            assert (
-                "_SCRIPT_DIR" not in str(first_arg[0])
-            ), f"Script path contains {{_SCRIPT_DIR}}: {first_arg[0]}"
-            assert "_SECURE_AGENT_SCRIPT" in str(first_arg[0]), (
-                f"Script path should use _SECURE_AGENT_SCRIPT, got: {first_arg[0]}"
-            )
+        assert resp.status_code == 200
+        assert resp.get_json()["choices"][0]["message"]["content"] == "informe"
+        assert mock_run.called
+        args = mock_run.call_args[0][0]
+        _assert_real_script(args)
+        assert "--security" in args, "falta el flag --security"
+
+    @patch("subprocess.run")
+    def test_ask_uses_real_script_path(self, mock_run, client):
+        """El endpoint /ask debe usar la ruta real de sec-agent con --security."""
+        mock_run.return_value.stdout = "informe"
+        mock_run.return_value.stderr = ""
+        mock_run.return_value.returncode = 0
+
+        resp = client.post("/ask", json={"pregunta": "estado"})
+        assert resp.status_code == 200
+        assert resp.get_json()["respuesta"] == "informe"
+        assert mock_run.called
+        args = mock_run.call_args[0][0]
+        _assert_real_script(args)
+        assert "--security" in args, "falta el flag --security"
 
     @patch("subprocess.run")
     def test_chat_exception_returns_error_spanish(self, mock_run, client):
@@ -215,6 +233,26 @@ class TestChatPaths:
         response = client.post("/ask", json={"pregunta": "estado"})
         data = response.get_json()
         assert "Error ejecutando sec-agent" in data["respuesta"]
+
+
+@pytest.mark.integration
+def test_chat_integration_runs_real_agent(client, tmp_path, monkeypatch):
+    """Integración: ejecuta el endpoint real (sin mock) y valida informe no vacío.
+
+    Se marca como 'integration' porque lanza el binario sec-agent real (lento) y
+    escribe en una BD y un directorio de informes temporales, no en producción.
+    """
+    monkeypatch.setenv("EDGE_DB_PATH", str(tmp_path / "integration.db"))
+    monkeypatch.setenv("REPORTS_DIR", str(tmp_path / "reports"))
+    resp = client.post(
+        "/v1/chat/completions",
+        json={"messages": [{"role": "user", "content": "estado"}]},
+    )
+    assert resp.status_code == 200
+    content = resp.get_json()["choices"][0]["message"]["content"]
+    assert content.strip() != "", "el endpoint devolvió contenido vacío"
+    assert content != "Error ejecutando sec-agent"
+    assert "[ERROR]" not in content
 
 
 # ── Bootstrap validation ──────────────────────────────────────────────────
