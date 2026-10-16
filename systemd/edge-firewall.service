@@ -1,0 +1,15 @@
+[Unit]
+Description=Edge Sec Agent - Firewall persistence (IPv4 + IPv6)
+Documentation=https://github.com/jqime/edge-sec-agent
+After=tailscaled.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+ExecStart=/opt/edge-sec-agent/scripts/apply_firewall.sh
+ExecStop=/opt/edge-sec-agent/scripts/apply_firewall.sh --remove
+
+[Install]
+WantedBy=multi-user.target

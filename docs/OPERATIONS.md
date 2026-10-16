@@ -81,6 +81,54 @@ Incluye SQLite + reportes, checksum SHA256 y verificación `PRAGMA integrity_che
 - Si falla, reinicia únicamente `edge-sec-agent` y registra causa.
 - `/metrics` exporta uptime, requests, errores HTTP, estado de Ollama, última actualización y commit.
 
+## Firewall (IPv4 + IPv6)
+
+El hardening de firewall lo gestiona `systemd/edge-firewall.service`, un unit
+`oneshot` ordenado tras `tailscaled.service`. Aplica reglas **idempotentes**
+(`iptables -C || -A`) mediante `scripts/apply_firewall.sh` y **nunca hace flush**
+de la tabla `filter`, por lo que no interfiere con las cadenas de Tailscale
+(`ts-input`/`ts-forward`).
+
+Reglas (IPv4 e IPv6 en espejo):
+
+- `ACCEPT` tcp 5000 y 11434 desde loopback (`127.0.0.1` / `::1`)
+- `DROP` tcp 5000 y 11434 para el resto
+- `ACCEPT` tcp 2222 entrando por `tailscale0` (SSH Dropbear)
+- `DROP` tcp 2222 para el resto
+- `DROP` tcp 22
+
+Aplicar / simular / revertir:
+
+```bash
+sudo /opt/edge-sec-agent/scripts/apply_firewall.sh           # aplica (idempotente)
+sudo /opt/edge-sec-agent/scripts/apply_firewall.sh --dry-run # simula sin cambiar
+sudo /opt/edge-sec-agent/scripts/apply_firewall.sh --remove  # rollback
+```
+
+Instalar y activar la persistencia:
+
+```bash
+sudo cp /opt/edge-sec-agent/systemd/edge-firewall.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now edge-firewall.service
+systemctl status edge-firewall --no-pager
+sudo iptables -S INPUT
+sudo ip6tables -S INPUT
+```
+
+Verificar tras reaplicar (sin reboot de la Pi):
+
+```bash
+sudo systemctl restart edge-firewall.service
+sudo iptables -L INPUT -n -v --line-numbers   # la primera regla debe seguir siendo ts-input
+sudo ip6tables -L INPUT -n -v --line-numbers
+```
+
+> **Advertencia Tailscale:** NO persistir las cadenas `ts-input`/`ts-forward`
+> con `netfilter-persistent`/`iptables-restore`: `iptables-restore` hace flush
+> de la tabla `filter` y puede romper el firewall de Tailscale (riesgo de
+> lockout). Este unit evita ese escenario al no hacer flush y solo usar `-A`.
+
 ## Seguridad y privilegios
 
 Tareas que requieren root:
