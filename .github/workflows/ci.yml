@@ -62,6 +62,7 @@ jobs:
               -e 's|/opt/edge-sec-agent/app/current/scripts/health_watchdog.sh|/bin/true|g' \
               -e 's|/opt/edge-sec-agent/app/current/scripts/update_safe.sh|/bin/true|g' \
               -e 's|/opt/edge-sec-agent/app/venv/bin/gunicorn|/bin/true|g' \
+              -e 's|/opt/edge-sec-agent/scripts/apply_firewall.sh|/bin/true|g' \
               "$file" > "$out"
           done
           systemd-analyze verify "$tmp_dir"/*.service "$tmp_dir"/*.timer
