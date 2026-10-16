@@ -12,8 +12,6 @@ Endpoints:
 """
 import logging
 import os
-
-_REPORTS_DIR = os.path.dirname(os.path.dirname(__file__)) + "/reports"
 import re
 import sqlite3
 import subprocess
@@ -381,7 +379,7 @@ def chat_completions() -> tuple[Response, int]:
         pregunta = "estado"
     try:
         result = subprocess.run(
-            ["_SECURE_AGENT_SCRIPT", "--security", pregunta],
+            [_SECURE_AGENT_SCRIPT, "--security", pregunta],
             capture_output=True,
             text=True,
             timeout=30,
@@ -398,12 +396,17 @@ def chat_completions() -> tuple[Response, int]:
 
 @app.route("/ask", methods=["POST"])
 def ask() -> tuple[Response, int]:
-    """Endpoint legacy — ejecuta sec-agent con la pregunta del usuario."""
+    """Endpoint legacy — responde con el informe de seguridad (sec-agent --security).
+
+    El binario sec-agent no soporta consultas libres: la única modalidad
+    implementada es '--security'. La pregunta se conserva como contexto, pero
+    la respuesta es siempre el informe de seguridad del sistema.
+    """
     data = request.get_json(silent=True) or {}
     pregunta = data.get("pregunta", "")
     try:
         result = subprocess.run(
-            ["_SECURE_AGENT_SCRIPT", pregunta],
+            [_SECURE_AGENT_SCRIPT, "--security", pregunta],
             capture_output=True,
             text=True,
             timeout=30,

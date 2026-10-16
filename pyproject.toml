@@ -10,3 +10,9 @@ line-length = 100
 [tool.mypy]
 python_version = "3.11"
 strict = false
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: tests que ejecutan el binario sec-agent real (lentos)",
+]
+addopts = "-m 'not integration'"
