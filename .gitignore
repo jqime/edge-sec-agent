@@ -38,3 +38,13 @@ venv/
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Runtime and local config artifacts
+# app/ — layout PR#4 incompleto, materializar en LOTE 6/7
+app/
+# config/*.env — config real del host (no la plantilla .example)
+config/*.env
+# update.lock — runtime lock de update_safe.sh
+update.lock
+# *.bak.* — backups manuales de ficheros
+*.bak.*
