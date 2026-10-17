@@ -245,5 +245,42 @@ Atomic Deployment | Defense in Depth | Infrastructure as Code | SRE
 
 ---
 
+## Preguntas Frecuentes del Tribunal (Q&A)
+
+**P: ¿Por qué un agente en el borde y no en la nube?**
+R: Latencia, coste de ancho de banda y soberanía de datos. El nodo decide localmente; no depende de conectividad ni de un proveedor externo.
+
+**P: ¿Cómo evitáis exponer la API interna?**
+R: Gunicorn `:5000` y Ollama `:11434` escuchan solo en `127.0.0.1`. El firewall aplica `DROP` a esos puertos desde fuera de loopback. El único acceso externo es Nginx `:8443` con TLS y Basic Auth.
+
+**P: ¿Qué pasa con el puerto 22 y el SSH?**
+R: `:22` está `DROP` a nivel de kernel (IPv4 + IPv6). El panel administrativo usa Dropbear en `:2222`, alcanzable **únicamente** por la interfaz `tailscale0`.
+
+**P: ¿Cómo se protege la MicroSD de la degradación NAND?**
+R: Retención automática de SQLite (30 días) y desvío de logs a RAM (DietPi-Ramlog), reduciendo escrituras síncronas.
+
+**P: ¿Qué pasa si el agente cae?**
+R: systemd lo reinicia (`Restart=always`) y un `health.timer` actúa como watchdog; `backup.timer` respalda con verificación de integridad SQLite.
+
+**P: ¿Cómo garantizas que el despliegue es reproducible en ARM64?**
+R: Bootstrap idempotente (`bootstrap_debian_arm64.sh`), separación código/config/datos y CI que corre en un runner ARM64 nativo (`ubuntu-24.04-arm`).
+
+**P: ¿Y si un cambio solo funciona en x86_64?**
+R: El CI ejecuta la misma matriz en x86_64 y ARM64, y además los tests de integración reales **solo** en ARM64 (la arquitectura de producción).
+
+**P: ¿Hubo secretos en el repositorio?**
+R: Sí, en el histórico. Se **rotaron** (tokens revocados) y se **purgó el histórico** con `git filter-repo`: hoy hay 0 rastros. Es un ejemplo de gestión de incidentes, no una virtud inicial.
+
+**P: ¿Por qué Basic Auth y no OAuth/JWT?**
+R: Es un servicio administrativo de un único operador detrás de Tailscale; Basic Auth sobre TLS, más Fail2Ban y rate limiting, cubre el modelo de amenaza sin añadir complejidad.
+
+**P: ¿Qué NO hace el proyecto?**
+R: No hay alta disponibilidad multi-nodo, ni análisis ML propio, ni pruebas de hardware en CI. Se documentan como limitaciones y están en el roadmap.
+
+**P: ¿Cómo demuestras que funciona de verdad?**
+R: Evidencia reproducible: 49 tests, endpoint `/v1/global/health` HEALTHY, `/metrics`, servicios systemd `active`, CI verde en ambas arquitecturas.
+
+---
+
 **Documento preparado para**: Defensa ante tribunal técnico | Exhibición en portfolio profesional
-**Versión**: 1.0 | **Proyecto**: Edge Security Agent | **Hardware**: Orange Pi Zero 3
+**Versión**: 2.0 (post-remediación LOTE 0-9 + purga histórica) | **Fecha**: 2026-10-17 | **Proyecto**: Edge Security Agent | **Hardware**: Orange Pi Zero 3
