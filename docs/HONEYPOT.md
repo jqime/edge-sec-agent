@@ -9,6 +9,8 @@ Honeypot SSH aislado que captura intentos de acceso, credenciales y comandos de 
 - Usuario: `cowrie` (uid 993, cuenta bloqueada, sin privilegios).
 - Directorio: `/opt/cowrie/cowrie-git` (checkout) + `/opt/cowrie/venv` (entorno Python).
 - Versión Cowrie: `0.1.dev1+gc7773f497` · Twisted 26.4.0 · Python 3.13.5.
+- Alertas: `cowrie-alert.timer` → `cowrie-alert.service` (cada 60 s) ejecuta `scripts/cowrie_alert.sh`.
+- Endurecimiento systemd: `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict`, `ProtectHome=true`, `ProtectKernelTunables`, `ProtectControlGroups`, `RestrictRealtime`, `ReadWritePaths=/opt/cowrie/cowrie-git/var`.
 
 ## Aislamiento (principio de mínimo privilegio)
 
@@ -51,6 +53,8 @@ user:x:user
 ```
 
 Formato Cowrie `usuario:x:password` (el campo `x` se ignora). Estas credenciales **no** existen en el sistema real; solo permiten que Cowrie conceda una shell falsa y registre `cowrie.command.input`.
+
+> **Importante:** `userdb.txt` se lee con encoding **ASCII** (`cowrie/core/auth.py`). Cualquier carácter no-ASCII (p. ej. un guion largo `—`) provoca un `UnicodeDecodeError` y rompe toda la autenticación. Mantener el fichero en ASCII puro.
 
 ## Logs
 
@@ -104,11 +108,13 @@ sudo -u edgesec /opt/edge-sec-agent/scripts/cowrie_alert.sh
 | Captura de comando | `cowrie.login.success` + `cowrie.command.input` |
 | Anti-spam | 15 eventos → 1 alerta; eventos nuevos mismos IP → suprimidos |
 | Telegram | respuesta API `{"ok":true, message_id:1328}` |
+| Timer automático | `cowrie-alert.timer` active/enabled; oneshot `status=0/SUCCESS`; próxima ejecución programada |
+| Tras endurecimiento | login falso + `cowrie.command.input` siguen capturándose; `systemd-analyze verify` exit 0 |
+| Exposición systemd | `systemd-analyze security cowrie.service` → 7.9 EXPOSED (honeypot emula sistema completo) |
 
 ## Limitaciones y próximos pasos
 
-- **Sin timer**: las alertas solo se envían cuando se ejecuta `cowrie_alert.sh`. Pendiente de autorización añadir `cowrie-alert.timer` (p. ej. cada 60 s).
 - **Endpoint `/api/honeypot`** (opcional) no implementado: requeriría tocar `src/sec_web.py` (código de producción).
-- **Endurecimiento systemd**: la unit es funcional pero no incluye `ProtectSystem`/`ProtectHome`/`NoNewPrivileges`.
+- **Exposición systemd 7.9**: podría bajarse con `RestrictAddressFamilies`, `SystemCallFilter` o `MemoryDenyWriteExecute`, con riesgo de romper Cowrie; pendiente de validación por etapas.
 - **Persistencia en reinicio**: `cowrie.service` está `enabled`, pero el firewall no tiene regla para `2223` (por diseño, sin tocar firewall).
 - **Bloat/espacio**: el checkout + venv ocupan espacio en `/opt`; sin swap activo (decisión del owner).

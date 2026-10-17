@@ -1,0 +1,11 @@
+[Unit]
+Description=Cowrie honeypot Telegram alert dispatcher
+After=cowrie.service
+Wants=cowrie.service
+
+[Service]
+Type=oneshot
+User=edgesec
+Group=edgesec
+WorkingDirectory=/opt/edge-sec-agent
+ExecStart=/opt/edge-sec-agent/scripts/cowrie_alert.sh

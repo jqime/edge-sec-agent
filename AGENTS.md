@@ -9,8 +9,8 @@
 - Estado de la Orange Pi: VERIFICADA EN HARDWARE
 - Estado CI: VERDE (x86_64 + ARM64 nativo)
 - Tests: 49 passed (+1 deselected), coverage 55%
-- Honeypot: `cowrie.service` active/enabled en `:2223`; alertas Telegram `scripts/cowrie_alert.sh`
-- Riesgos abiertos: timer de alertas pendiente; endpoint `/api/honeypot` opcional; CI ARM64 estable
+- Honeypot: `cowrie.service` active/enabled en `:2223`; alertas Telegram `scripts/cowrie_alert.sh`; timer `cowrie-alert.timer` (60s); unit endurecida
+- Riesgos abiertos: endpoint `/api/honeypot` opcional; exposición systemd de cowrie (7.9) mejorable
 
 ---
 
@@ -1140,10 +1140,15 @@ Desplegar un Honeypot SSH (Cowrie) aislado y alertas Telegram, sentando base par
 #### Aislamiento
 Cowrie **no** toca `:2222` (Dropbear), `:5000` (API), nginx, Tailscale ni el firewall. Usuario y directorio dedicados.
 
+#### Cerrado tras revisión (misma sesión)
+- Timer `cowrie-alert.timer` (cada 60s) creado, enabled y verificado (oneshot `status=0/SUCCESS`).
+- Endurecimiento systemd de `cowrie.service`: `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict`, `ProtectHome`, `ReadWritePaths=/opt/cowrie/cowrie-git/var`; captura validada tras el cambio.
+- Bug corregido: `etc/userdb.txt` con em-dash rompía la auth de Cowrie (lee ASCII) → fichero purgado a ASCII.
+- Units versionadas en `systemd/cowrie.service`, `systemd/cowrie-alert.service`, `systemd/cowrie-alert.timer`.
+
 #### Pendiente (requiere autorización)
-- Timer `cowrie-alert.timer` para alertas automáticas.
-- Endpoint `/api/honeypot` (opcional, toca `src/sec_web.py`).
-- Endurecimiento systemd de la unit (ProtectSystem/ProtectHome/NoNewPrivileges).
+- Endpoint `/api/honeypot` (opcional, toca `src/sec_web.py`) — descartado por ahora.
+- Reducir exposición systemd (RestrictAddressFamilies/SystemCallFilter), por etapas.
 
 #### Estado final
-Honeypot operativo y verificado. **Sin commit ni push** (a la espera del owner).
+Honeypot operativo, endurecido, con alertas automáticas. Commit selectivo + push (CI a validar).
