@@ -80,6 +80,7 @@ The complete topology diagram is available at [docs/architecture.txt](docs/archi
 - **Local LLM**: Ollama integration (`tinyllama:1.1b`) for automated security reporting and latency/health probing.
 - **REST API**: OpenAI-shaped endpoints (`/v1/models`, `/v1/chat/completions`) returning live security reports and metrics. The completions endpoint returns a security report and is not a free-form chat interface.
 - **Telemetry**: Prometheus `/metrics` endpoint, a live security score at `/api/metrics`, and SQLite (WAL) historical retention with a 30-day policy.
+- **Honeypot RAG (Phase 2)**: natural-language queries over Cowrie logs via Ollama embeddings (`nomic-embed-text`) + `sqlite-vec`, executed from an isolated venv (`scripts/rag_query.py`). No PyTorch, no production impact. See `docs/RAG.md`.
 
 ### DevSecOps Automation
 

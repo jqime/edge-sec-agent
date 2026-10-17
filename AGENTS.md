@@ -1152,3 +1152,33 @@ Cowrie **no** toca `:2222` (Dropbear), `:5000` (API), nginx, Tailscale ni el fir
 
 #### Estado final
 Honeypot operativo, endurecido, con alertas automáticas. Commit selectivo + push (CI a validar).
+
+---
+
+### Sesión 2026-10-17 — RAG ligero sobre logs del Honeypot (Fase 2)
+
+#### Objetivo
+Consultar en lenguaje natural los eventos de Cowrie con RAG, sin PyTorch y sin tocar producción.
+
+#### Decisión de diseño
+`ChromaDB + sentence-transformers` descartado: arrastra PyTorch y la Pi tiene 3.9 GB RAM / **0 swap** (riesgo de OOM). Adoptado **Ollama `nomic-embed-text`** (768 dims) + **SQLite `sqlite-vec`** + LLM **`qwen2.5:1.5b`**.
+
+#### Cambios realizados
+- Venv aislado `/opt/edge-sec-agent-rag/venv` (`requests`, `sqlite-vec 0.1.9`, `ollama`). No toca el venv de producción.
+- Modelos Ollama: `nomic-embed-text` (274 MB) y `qwen2.5:1.5b` (986 MB).
+- Script `scripts/rag_query.py` (nuevo): subcomandos `ingest` / `stats` / `ask`; digest determinista + búsqueda semántica opcional; rutas por env.
+- Docs: `docs/RAG.md` (nuevo); README (bullet en *Edge AI and Observability*); esta entrada.
+
+#### Evidencia
+- `sqlite-vec` carga OK (`vec_version v0.1.9`); embeddings de 768 dims.
+- `ingest`: 73 eventos → `cowrie_vec.db` (3.1 MB), ~2 min.
+- `ask` (`qwen2.5:1.5b`, `RAG_TOP_K=0`): respuesta correcta con las 3 IPs y los comandos reales; ~3 min.
+- RAM estable (pico ~3.4 GB usados, ~0.5 GB libres), sin OOM.
+- `tinyllama:1.1b` descartado (contó 3 logins en vez de 4).
+
+#### No se tocó
+`src/sec_web.py`, el venv de producción, el firewall, Cowrie ni systemd. Fase 3 (endpoint) **pendiente de OK del owner**.
+
+#### Estado final
+Fase 2 (CLI aislado) completada y validada. Integración en producción a la espera de autorización.
+
