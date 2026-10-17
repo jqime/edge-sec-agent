@@ -33,7 +33,11 @@ REPORTS_DIR = (
     or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reports")
 )
 
-SECRETS_PATH = "/root/edge-sec-agent/secrets.env"
+SECRETS_PATH = (
+    os.environ.get("SECRETS_PATH")
+    or os.environ.get("EDGE_SECRETS_PATH")
+    or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "secrets.env")
+)
 if os.path.exists(SECRETS_PATH):
     _key_re = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
     try:

@@ -22,7 +22,8 @@ def _isolate_db():
 @pytest.fixture(autouse=True)
 def _clean_env():
     """Limpia variables que agent.py lee al cargar."""
-    for k in ("SSH_LOG_PATHS", "EDGE_MODEL", "EDGE_MAX_TOKENS", "EDGE_TIMEOUT", "REPORTS_DIR"):
+    for k in ("SSH_LOG_PATHS", "EDGE_MODEL", "EDGE_MAX_TOKENS", "EDGE_TIMEOUT", "REPORTS_DIR",
+              "SECRETS_PATH", "EDGE_SECRETS_PATH"):
         os.environ.pop(k, None)
     yield
 
@@ -207,3 +208,17 @@ class TestFormatReport:
     def test_no_ports(self):
         report = agent._format_report(100, 0, [], None, None)
         assert "ninguno" in report
+
+
+# ── SECRETS_PATH ─────────────────────────────────────────────────────────
+
+class TestSecretsPath:
+    def test_secrets_path_is_systemd_safe(self):
+        from src.agent import SECRETS_PATH
+        assert "/root/" not in SECRETS_PATH
+        assert SECRETS_PATH.endswith("secrets.env")
+
+    def test_secrets_path_default_derives_from_project_root(self):
+        import os as _os
+        root = _os.path.dirname(_os.path.dirname(_os.path.abspath(agent.__file__)))
+        assert agent.SECRETS_PATH == _os.path.join(root, "secrets.env")

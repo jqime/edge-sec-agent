@@ -9,6 +9,29 @@ Este documento define una ruta reproducible para desplegar y operar `edge-sec-ag
 - **Datos persistentes:** `/opt/edge-sec-agent/data`
 - **Reportes y backups:** `/opt/edge-sec-agent/reports`, `/opt/edge-sec-agent/backups`
 
+## Jerarquía de rutas
+
+| Recurso | Ruta | Notas |
+|---|---|---|
+| Código | `/opt/edge-sec-agent` (actual) / `/opt/edge-sec-agent/app/current` (layout futuro) | Fuente de verdad del despliegue actual |
+| Configuración | `/opt/edge-sec-agent/config/` | `edge-sec-agent.env`, `640 root:edgesec`, sin secretos |
+| Secretos | `/opt/edge-sec-agent/secrets.env` | `600 edgesec:edgesec`, fuera de Git |
+| Datos | `/opt/edge-sec-agent/data/` | SQLite (`history.db`), `ReadWritePaths` del unit |
+| Reportes | `/opt/edge-sec-agent/reports/` | `ReadWritePaths` del unit |
+| Backups | `/opt/edge-sec-agent/backups/` | `ReadWritePaths` del unit |
+| Logs | `/opt/edge-sec-agent/logs/` | `ReadWritePaths` del unit |
+
+El unit de producción corre con `User=edgesec`, `ProtectHome=true` y
+`ProtectSystem=strict`. Por eso **ninguna ruta viva puede depender de `/root`**:
+`/root` queda oculto para el proceso y cualquier `os.path.exists()` sobre él
+devuelve `False` en silencio.
+
+Las rutas del código se derivan de `__file__` (nunca hardcodeadas) y admiten
+sobreescritura por variable de entorno:
+
+- Reportes: `REPORTS_DIR` → `EDGE_REPORTS_DIR` → `<raíz del proyecto>/reports`
+- Secretos: `SECRETS_PATH` → `EDGE_SECRETS_PATH` → `<raíz del proyecto>/secrets.env`
+
 ## Bootstrap idempotente desde cero
 
 > Requiere root y Debian/DietPi ARM64.
