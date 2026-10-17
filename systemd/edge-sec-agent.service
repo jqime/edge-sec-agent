@@ -7,10 +7,11 @@ Wants=network-online.target
 Type=simple
 User=edgesec
 Group=edgesec
-WorkingDirectory=/opt/edge-sec-agent/app/current
+WorkingDirectory=/opt/edge-sec-agent
 EnvironmentFile=-/opt/edge-sec-agent/config/edge-sec-agent.env
-Environment=PATH=/opt/edge-sec-agent/app/venv/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/opt/edge-sec-agent/app/venv/bin/gunicorn --bind 127.0.0.1:5000 --workers 2 --timeout 120 wsgi:app
+Environment="PATH=/opt/edge-sec-agent/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/opt/edge-sec-agent"
+ExecStart=/opt/edge-sec-agent/venv/bin/gunicorn --bind 127.0.0.1:5000 --workers 2 --timeout 300 wsgi:app
 Restart=on-failure
 RestartSec=5
 TimeoutStartSec=45

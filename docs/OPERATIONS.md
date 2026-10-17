@@ -46,12 +46,40 @@ El bootstrap valida arquitectura/memoria/espacio, crea `edgesec`, instala depend
 
 ## Servicios systemd
 
-Units recomendadas (en `systemd/`):
+Units del repositorio (`systemd/`) y estado esperado en el host:
 
-- `edge-sec-agent.service`: API Gunicorn (least privilege con `User=edgesec`)
-- `edge-sec-agent-health.timer`: watchdog periódico
-- `edge-sec-agent-backup.timer`: backup periódico
-- `edge-sec-agent-update.timer`: actualización segura **opt-in**
+| Unit | Instalado | Estado |
+|---|---|---|
+| `edge-sec-agent.service` | Sí | enabled/active (API Gunicorn, `User=edgesec`) |
+| `edge-firewall.service` | Sí | enabled/active (oneshot, firewall idempotente) |
+| `edge-sec-agent-health.timer` + `.service` | Sí | enabled/active (watchdog cada 2 min) |
+| `edge-sec-agent-backup.timer` + `.service` | Sí | enabled/active (backup horario) |
+| `edge-sec-agent-update.timer` + `.service` | **No** | **opt-in OFF** (ver sección) |
+
+Los `ExecStart` de los servicios `oneshot` apuntan al layout actual
+(`/opt/edge-sec-agent/scripts/...`); el unit principal usa
+`WorkingDirectory=/opt/edge-sec-agent` y `venv/bin/gunicorn`. **No** se usa el
+layout obsoleto `app/current` + `app/venv` (symlinks rotos a `/root`, ilegibles
+bajo `ProtectHome=true`).
+
+> El unit `edge-sec-agent-staging.service` (`:5001`) fue **retirado**: era un
+> checkout duplicado no versionado. Backup en
+> `/var/backups/edge-sec-agent/staging-<timestamp>`.
+
+Verificar timers:
+
+```bash
+systemctl list-timers --all | grep edge
+systemctl status edge-sec-agent-health.timer edge-sec-agent-backup.timer --no-pager
+journalctl -u edge-sec-agent-health.service -n 5 --no-pager
+```
+
+Ejecutar manualmente / deshabilitar:
+
+```bash
+sudo systemctl start edge-sec-agent-backup.service     # backup puntual
+sudo systemctl disable --now edge-sec-agent-health.timer edge-sec-agent-backup.timer
+```
 
 Validación recomendada:
 

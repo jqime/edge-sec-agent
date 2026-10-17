@@ -5,4 +5,4 @@ Description=Edge Sec Agent health watchdog
 Type=oneshot
 User=root
 EnvironmentFile=-/opt/edge-sec-agent/config/edge-sec-agent.env
-ExecStart=/opt/edge-sec-agent/app/current/scripts/health_watchdog.sh
+ExecStart=/opt/edge-sec-agent/scripts/health_watchdog.sh

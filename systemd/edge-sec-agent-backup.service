@@ -5,4 +5,4 @@ Description=Edge Sec Agent backup job
 Type=oneshot
 User=root
 EnvironmentFile=-/opt/edge-sec-agent/config/edge-sec-agent.env
-ExecStart=/opt/edge-sec-agent/app/current/scripts/backup_state.sh
+ExecStart=/opt/edge-sec-agent/scripts/backup_state.sh
