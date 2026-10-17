@@ -122,6 +122,8 @@ RULES_V4="
 -p tcp --dport 11434 -j DROP
 -i ${TS_IFACE} -p tcp --dport 2222 -j ACCEPT
 -p tcp --dport 2222 -j DROP
+-i ${TS_IFACE} -p tcp --dport 2223 -j ACCEPT
+-p tcp --dport 2223 -j DROP
 -p tcp --dport 22 -j DROP
 "
 
@@ -132,6 +134,8 @@ RULES_V6="
 -p tcp --dport 11434 -j DROP
 -i ${TS_IFACE} -p tcp --dport 2222 -j ACCEPT
 -p tcp --dport 2222 -j DROP
+-i ${TS_IFACE} -p tcp --dport 2223 -j ACCEPT
+-p tcp --dport 2223 -j DROP
 -p tcp --dport 22 -j DROP
 "
 

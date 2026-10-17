@@ -5,7 +5,7 @@ Honeypot SSH aislado que captura intentos de acceso, credenciales y comandos de 
 ## Estado
 
 - Servicio: `cowrie.service` (systemd) — `active`, `enabled`.
-- Escucha: `0.0.0.0:2223` (puerto dedicado; **no** toca `2222` Dropbear ni `5000` API).
+- Escucha: `0.0.0.0:2223` (puerto dedicado; **no** toca `2222` Dropbear ni `5000` API). Acceso entrante restringido por firewall a la interfaz `tailscale0` (ver *Aislamiento*).
 - Usuario: `cowrie` (uid 993, cuenta bloqueada, sin privilegios).
 - Directorio: `/opt/cowrie/cowrie-git` (checkout) + `/opt/cowrie/venv` (entorno Python).
 - Versión Cowrie: `0.1.dev1+gc7773f497` · Twisted 26.4.0 · Python 3.13.5.
@@ -26,7 +26,14 @@ Atacante ──▶ :2223 ──▶ cowrie.service (User=cowrie, sin root)
 Producción (intacta): Dropbear :2222 (tailscale0) · Gunicorn :5000 (loopback) · Nginx :8443
 ```
 
-Cowrie **no** comparte usuario, directorio ni puerto con el agente principal. El firewall no se ha modificado: con la política actual, `2223` queda alcanzable en LAN y Tailscale (y por Internet solo si el router reenvía).
+Cowrie **no** comparte usuario, directorio ni puerto con el agente principal. El puerto `2223` está restringido por firewall (unit `edge-firewall`, `scripts/apply_firewall.sh`): solo se acepta tráfico entrante por la interfaz `tailscale0`; en cualquier otra interfaz (loopback, LAN, WAN) se descarta. Reglas espejo IPv4 + IPv6:
+
+```
+-A INPUT -i tailscale0 -p tcp --dport 2223 -j ACCEPT
+-A INPUT -p tcp --dport 2223 -j DROP
+```
+
+Así, aunque el listener siga siendo `0.0.0.0:2223`, el honeypot solo es alcanzable desde la tailnet. Si la Pi se conecta a una red wifi pública, el puerto no queda visible para el resto de esa red.
 
 ## Configuración
 
@@ -104,6 +111,7 @@ sudo -u edgesec /opt/edge-sec-agent/scripts/cowrie_alert.sh
 |---|---|
 | Servicio activo | `systemctl is-active cowrie` → `active` |
 | Escucha en 2223 | `ss -tlnp` → `0.0.0.0:2223` (twistd) |
+| Acceso a 2223 | `iptables -S INPUT \| grep 2223` → `ACCEPT` en `tailscale0` + `DROP`; conexión a `127.0.0.1:2223` / `192.168.1.141:2223` → timeout (bloqueado) |
 | Captura de intento | `cowrie.login.failed` en `cowrie.json` |
 | Captura de comando | `cowrie.login.success` + `cowrie.command.input` |
 | Anti-spam | 15 eventos → 1 alerta; eventos nuevos mismos IP → suprimidos |
@@ -153,5 +161,5 @@ Para capturar escaneos de Internet habría que redirigir el puerto en el router 
 
 - **Endpoint `/api/honeypot`** (opcional) no implementado: requeriría tocar `src/sec_web.py` (código de producción).
 - **Exposición systemd 7.9**: podría bajarse con `RestrictAddressFamilies`, `SystemCallFilter` o `MemoryDenyWriteExecute`, con riesgo de romper Cowrie; pendiente de validación por etapas.
-- **Persistencia en reinicio**: `cowrie.service` está `enabled`, pero el firewall no tiene regla para `2223` (por diseño, sin tocar firewall).
+- **Acceso al puerto**: `2223` está restringido a `tailscale0` por `edge-firewall` (aplicado y validado). Solo peers de la tailnet pueden alcanzar el honeypot.
 - **Bloat/espacio**: el checkout + venv ocupan espacio en `/opt`; sin swap activo (decisión del owner).
