@@ -112,6 +112,43 @@ sudo -u edgesec /opt/edge-sec-agent/scripts/cowrie_alert.sh
 | Tras endurecimiento | login falso + `cowrie.command.input` siguen capturándose; `systemd-analyze verify` exit 0 |
 | Exposición systemd | `systemd-analyze security cowrie.service` → 7.9 EXPOSED (honeypot emula sistema completo) |
 
+## Captura de Tráfico Real
+
+Ciclo completo verificado con tráfico real (no solo sintético local):
+
+| Origen | Clasificación | Eventos |
+|---|---|---|
+| `127.0.0.1` | Pruebas locales (`sshpass`) | 47 |
+| `100.109.41.91` | Peer Tailscale del owner (portátil Windows "jaime") | 10 |
+
+Ciclo observado desde `100.109.41.91` (2026-10-17 21:04–21:05 UTC):
+
+```
+session.connect -> client.version -> client.kex
+  -> login.failed (usuario: root)
+  -> login.success (usuario: root, password: 123456)
+  -> command.input ("ls -la")
+  -> command.input ("whoami")
+  -> session.closed
+```
+
+Muestra del formato de alerta recibida en Telegram (texto, sin secretos):
+
+```
+Honeypot Cowrie - amenaza detectada
+Evento: cowrie.login.success
+Origen: 100.109.41.91
+Detalle: root
+Hora: 2026-10-17T21:05:16Z
+Sensor: Orange Pi Zero 3 (:2223)
+```
+
+### Aclaración sobre el origen (honestidad técnica)
+
+`100.109.41.91` pertenece al rango CGNAT de Tailscale (`100.64.0.0/10`); **no es tráfico de Internet**. Es el equipo del owner conectando por la tailnet durante la prueba de fuego. En el log **no aparece ninguna IP pública**: las únicas `src_ip` son `127.0.0.1` y `100.109.41.91`. El puerto `2223` **no está expuesto a Internet** (no hay port-forwarding en el router), por lo que aún **no se ha capturado tráfico de Internet real**.
+
+Para capturar escaneos de Internet habría que redirigir el puerto en el router (decisión de red del owner, no aplicada) o exponer el puerto por otro medio.
+
 ## Limitaciones y próximos pasos
 
 - **Endpoint `/api/honeypot`** (opcional) no implementado: requeriría tocar `src/sec_web.py` (código de producción).
