@@ -120,25 +120,30 @@ sudo -u edgesec /opt/edge-sec-agent/scripts/cowrie_alert.sh
 | Tras endurecimiento | login falso + `cowrie.command.input` siguen capturándose; `systemd-analyze verify` exit 0 |
 | Exposición systemd | `systemd-analyze security cowrie.service` → 7.9 EXPOSED (honeypot emula sistema completo) |
 
-## Captura de Tráfico Real
+## Evidencia de Captura (Entorno Controlado)
 
-Ciclo completo verificado con tráfico real (no solo sintético local):
+Análisis completo del log `cowrie.json` en el rango `2026-10-17T20:50:39Z` → `2026-10-17T21:48:19Z` (~1 h). Tres orígenes, **ninguno público**:
 
 | Origen | Clasificación | Eventos |
 |---|---|---|
-| `127.0.0.1` | Pruebas locales (`sshpass`) | 47 |
-| `100.109.41.91` | Peer Tailscale del owner (portátil Windows "jaime") | 10 |
+| `127.0.0.1` | Pruebas internas (`sshpass`) desde la Pi | 47 |
+| `100.109.41.91` | Portátil Windows del owner vía Tailscale ("jaime") | 12 |
+| `100.125.181.114` | IP Tailscale de la propia Orange Pi (autoprueba local) | 12 |
 
-Ciclo observado desde `100.109.41.91` (2026-10-17 21:04–21:05 UTC):
+Ciclo observado desde `100.109.41.91` (2026-10-17 21:04:58Z → 21:08:25Z UTC):
 
 ```
-session.connect -> client.version -> client.kex
-  -> login.failed (usuario: root)
-  -> login.success (usuario: root, password: 123456)
-  -> command.input ("ls -la")
-  -> command.input ("whoami")
+session.connect
+  -> client.version   (SSH-2.0-OpenSSH_for_Windows_9.5)
+  -> client.fingerprint (51:fc:78:46:7d:54:1e:a3:30:64:a2:1f:f8:2c:cf:9c)
+  -> login.failed     (usuario: root)
+  -> login.success    (usuario: root, password: 123456)
+  -> command.input    ("ls -la")
+  -> command.input    ("whoami")
   -> session.closed
 ```
+
+**Lección técnica (fingerprinting):** Cowrie capturó el *banner* del cliente SSH (`SSH-2.0-OpenSSH_for_Windows_9.5`) y el fingerprint de la clave del cliente. Es decir, además del usuario/contraseña, registra la huella del software y del host que se conecta: `OpenSSH_for_Windows_9.5` identifica un cliente Windows, no un bot Linux.
 
 Muestra del formato de alerta recibida en Telegram (texto, sin secretos):
 
@@ -151,11 +156,9 @@ Hora: 2026-10-17T21:05:16Z
 Sensor: Orange Pi Zero 3 (:2223)
 ```
 
-### Aclaración sobre el origen (honestidad técnica)
+### Nota de honestidad técnica (qué es y qué no es)
 
-`100.109.41.91` pertenece al rango CGNAT de Tailscale (`100.64.0.0/10`); **no es tráfico de Internet**. Es el equipo del owner conectando por la tailnet durante la prueba de fuego. En el log **no aparece ninguna IP pública**: las únicas `src_ip` son `127.0.0.1` y `100.109.41.91`. El puerto `2223` **no está expuesto a Internet** (no hay port-forwarding en el router), por lo que aún **no se ha capturado tráfico de Internet real**.
-
-Para capturar escaneos de Internet habría que redirigir el puerto en el router (decisión de red del owner, no aplicada) o exponer el puerto por otro medio.
+`100.109.41.91` y `100.125.181.114` pertenecen al rango CGNAT de Tailscale (`100.64.0.0/10`); **no es tráfico de Internet**. El primero es el portátil del owner y el segundo la propia Pi (confirmado con `tailscale ip -4`). En el log **no aparece ninguna IP pública**, por lo que **aún no se ha capturado tráfico de Internet real**: el puerto `2223` no está expuesto en el router (no hay port-forwarding), y ahora además está restringido a `tailscale0` por firewall. Capturar escaneos de Internet exigiría reenviar el puerto en el router (decisión de red del owner, no aplicada).
 
 ## Limitaciones y próximos pasos
 
