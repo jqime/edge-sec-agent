@@ -1,5 +1,6 @@
 #!/bin/bash
-SNAPSHOT_DIR="/root/forensics/$(date +%Y%m%d_%H%M%S)"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+SNAPSHOT_DIR="${EDGE_FORENSICS_DIR:-$PROJECT_ROOT/forensics}/$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$SNAPSHOT_DIR"
 ps auxf > "$SNAPSHOT_DIR/processes.txt"
 netstat -tulnp > "$SNAPSHOT_DIR/connections.txt" 2>/dev/null

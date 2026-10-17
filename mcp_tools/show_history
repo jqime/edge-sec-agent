@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
-DB="/root/edge-sec-agent/data/history.db"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+DB="${EDGE_DB_PATH:-$PROJECT_ROOT/data/history.db}"
 [ ! -f "$DB" ] && { echo "No history available"; exit 0; }
 if [ "${1:-}" = "--json" ]; then
     if command -v sqlite3 >/dev/null; then

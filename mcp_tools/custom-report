@@ -1,5 +1,6 @@
 #!/bin/bash
-OUTPUT_DIR="/root/reports"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+OUTPUT_DIR="${EDGE_REPORTS_DIR:-$PROJECT_ROOT/reports}"
 mkdir -p "$OUTPUT_DIR"
 case "$1" in
     daily)

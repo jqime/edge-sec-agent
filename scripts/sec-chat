@@ -1,12 +1,14 @@
 #!/bin/bash
 SCRIPT_DIR="$(dirname "$0")"
 if [ "$1" = "--tool" ] && [ -n "$2" ]; then
-    TOOL="${SCRIPT_DIR}/mcp_tools/$2"
+    TOOLNAME="$2"
+    TOOL="${SCRIPT_DIR}/../mcp_tools/$2"
+    [ -x "$TOOL" ] || TOOL="${SCRIPT_DIR}/../legacy/mcp_tools/$2"
     shift 2
     if [ -x "$TOOL" ]; then
         exec "$TOOL" "$@"
     else
-        echo "Herramienta no encontrada: $2"
+        echo "Herramienta no encontrada: $TOOLNAME"
         exit 1
     fi
 fi

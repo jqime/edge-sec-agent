@@ -2,15 +2,18 @@
 # mcp_tools/check_connections.sh
 # Descripción: Muestra las 10 IPs con más conexiones activas y alerta si total > 100.
 # Ubicación: mcp_tools/check_connections.sh
-# Lectura de configuración desde /root/edge-sec-agent/secrets.env
+# Lectura de configuración desde <raíz del proyecto>/secrets.env
 
 set -euo pipefail
 
-ROOT_DIR="/root/edge-sec-agent"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 SECRETS="$ROOT_DIR/secrets.env"
+TELEGRAM_NOTIFY="$ROOT_DIR/legacy/scripts/telegram-notify.sh"
 
 if [ -f "$SECRETS" ]; then
+  set +eu
   . "$SECRETS" >/dev/null 2>&1 || true
+  set -eu
 fi
 
 get_total_connections() {
@@ -52,8 +55,8 @@ main() {
   if [ -n "${total}" ] && [ "${total}" -gt 100 ]; then
     TOP_IPS=$(echo "$ips" | awk '{print $2}' | head -n 5 | paste -sd ", " -)
     MSG="ALERTA: Conexiones totales ${total}. Top IPs: ${TOP_IPS}"
-    if command -v /usr/local/bin/telegram-notify.sh >/dev/null 2>&1; then
-      /usr/local/bin/telegram-notify.sh "$MSG" 2>/dev/null || true
+    if [ -x "$TELEGRAM_NOTIFY" ]; then
+      "$TELEGRAM_NOTIFY" "$MSG" 2>/dev/null || true
     else
       echo "[WARN] telegram-notify.sh no disponible; no se envía alerta Telegram." >&2
     fi
