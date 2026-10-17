@@ -9,6 +9,7 @@ Autonomous DevSecOps and Perimeter Defense for ARM64 Edge Devices
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Platform](https://img.shields.io/badge/platform-ARM64%20%7C%20Debian%2013-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-green)
+![Repo Size](https://img.shields.io/badge/repo_size-1.3_MB-brightgreen)
 
 </div>
 
@@ -26,7 +27,7 @@ The project was audited and remediated across ten tracked workstreams. The remed
 | Chat / LLM Endpoint | Broken | Functional (Security Reports) |
 | Firewall | Not persistent, no IPv6 | Persistent IPv4 + IPv6 |
 | CI Pipeline | x86_64 only | x86_64 + Native ARM64 |
-| Repository Size | 51 MB | 21 MB |
+| Repository Size | 51 MB | 1.3 MB (purged history) |
 
 ## Architecture & Topology
 
@@ -61,6 +62,7 @@ Dropbear :2222  (tailscale0 interface only)
 | 8443 | Nginx (HTTPS) | public | TLS 1.2/1.3, Basic Auth, 5 r/s rate limit, security headers |
 | 5000 | Gunicorn / Flask API | `127.0.0.1` | loopback only, `DROP` externally |
 | 11434 | Ollama (local LLM) | `127.0.0.1` | loopback only, `DROP` externally |
+| 2223 | Cowrie Honeypot | `tailscale0` only | isolated sensor, `DROP` elsewhere |
 | 41641 | Tailscale (WireGuard) | UDP | tailnet VPN |
 
 The complete topology diagram is available at [docs/architecture.txt](docs/architecture.txt).
