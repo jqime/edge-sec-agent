@@ -13,7 +13,11 @@ on:
 
 jobs:
   lint-and-validate:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout del código
       uses: actions/checkout@v3
@@ -72,3 +76,7 @@ jobs:
         else
           echo "systemd-analyze no disponible en runner; omitido."
         fi
+
+    - name: Tests de integración (solo ARM64)
+      if: matrix.os == 'ubuntu-24.04-arm'
+      run: pytest tests/ -m integration -v --tb=short

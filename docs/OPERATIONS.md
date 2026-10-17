@@ -194,3 +194,25 @@ Tareas sin root (`edgesec`):
 - lectura/escritura de datos y reportes en rutas permitidas
 
 No se incluyen secretos en Git. Use `/opt/edge-sec-agent/config/edge-sec-agent.env` y almacénelos fuera del repositorio.
+
+## CI cross-arch (x86_64 + ARM64)
+
+El workflow `ci.yml` ejecuta la matriz `os: [ubuntu-latest, ubuntu-24.04-arm]`:
+
+- `ubuntu-latest` (x86_64): validaciones estándar (ruff, mypy, pytest, compileall, `bash -n`, `systemd-analyze verify`).
+- `ubuntu-24.04-arm` (ARM64 nativo): las mismas validaciones **más** los tests de integración reales.
+
+El test `@pytest.mark.integration` (`test_chat_integration_runs_real_agent`) se ejecuta **solo en ARM64**, que es la arquitectura de producción. Localmente se salta por defecto vía `addopts = "-m 'not integration'"` (pyproject.toml); se ejecuta con `pytest -m integration` (el `-m` de la CLI anula el `addopts`).
+
+Notas:
+
+- El test de integración es hardware-agnostic: aísla BD y reportes con `tmp_path`/`monkeypatch` y degrada con gracia si falta `/sys/class/thermal`.
+- Los runners ARM64 nativos de GitHub están disponibles para repositorios públicos. Si el label `ubuntu-24.04-arm` no estuviera disponible, el fallback es QEMU:
+
+```yaml
+- uses: docker/setup-qemu-action@v3
+- uses: actions/setup-python@v5
+  with:
+    python-version: '3.11'
+    architecture: 'arm64'
+```
