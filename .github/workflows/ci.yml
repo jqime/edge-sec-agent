@@ -69,7 +69,12 @@ jobs:
               -e 's|/opt/edge-sec-agent/scripts/apply_firewall.sh|/bin/true|g' \
               -e 's|/opt/edge-sec-agent/scripts/health_watchdog.sh|/bin/true|g' \
               -e 's|/opt/edge-sec-agent/scripts/backup_state.sh|/bin/true|g' \
+              -e 's|/opt/edge-sec-agent/scripts/cowrie_alert.sh|/bin/true|g' \
               -e 's|/opt/edge-sec-agent/venv/bin/gunicorn|/bin/true|g' \
+              -e 's|/opt/cowrie/venv/bin/twistd|/bin/true|g' \
+              -e 's|/opt/cowrie/cowrie-git/var|/tmp|g' \
+              -e 's|/opt/cowrie/cowrie-git|/tmp|g' \
+              -e 's|WorkingDirectory=/opt/edge-sec-agent|WorkingDirectory=/tmp|g' \
               "$file" > "$out"
           done
           systemd-analyze verify "$tmp_dir"/*.service "$tmp_dir"/*.timer
