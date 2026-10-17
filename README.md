@@ -1,9 +1,29 @@
 [![CI](https://github.com/jqime/edge-sec-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/jqime/edge-sec-agent/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-38%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-49%20passed-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![Platform](https://img.shields.io/badge/platform-ARM64-orange)
 
 # Edge Security Agent: Arquitectura Hardened para Entornos Embebidos (Orange Pi Zero 3)
+
+## Estado actual (TL;DR honesto)
+
+**Qué funciona hoy (verificado):**
+- API REST: `/v1/global/health`, `/metrics`, `/api/metrics`, `/v1/models`, `/v1/chat/completions`, `/ask`, `/`.
+- Chat/LLM funcional (devuelve un informe de seguridad real, no el antiguo error).
+- Firewall persistente IPv4 + IPv6 (unit `edge-firewall`, idempotente).
+- Timers systemd activos: `edge-sec-agent-health.timer`, `edge-sec-agent-backup.timer`.
+- Producción: `edge-sec-agent.service` activo en `127.0.0.1:5000` (solo loopback).
+
+**Qué NO está verificado / limitaciones:**
+- Purga histórica de secretos en Git: pendiente (rotados, pero aún presentes en el histórico — ver `git log --all -- secrets.env`).
+- PR #4 obsoleto: **pendiente de cierre manual** en GitHub (su contenido ya está en `main`; mergearlo sería un no-op).
+- CI: solo se ejecuta en x86_64 (no ARM64 nativo).
+
+**Tests:** 49 passed (+1 de integración deselected por defecto), coverage 55% (`src/sec_web.py` 70%).
+
+**Entorno real:** Debian GNU/Linux 13 (trixie), aarch64.
+
+**Aviso:** `legacy/` contiene herramientas no soportadas (mcp_tools y scripts movidos por deuda técnica). No usar en producción.
 
 ## 1. Resumen Ejecutivo
 
@@ -16,7 +36,7 @@ La infraestructura del agente está diseñada bajo el principio de mínimos priv
 | Componente / Servicio | Interfaz de Red | Puerto | Directiva de Seguridad y Control de Acceso |
 | :--- | :--- | :---: | :--- |
 | **Firewall Perimetral** | `0.0.0.0` / `::/0` | 22 | Directiva `DROP` total y persistente a nivel de Kernel mediante `iptables`. |
-| **Servicio SSH (Dropbear)** | `0.0.0.0` | 2222 | Puerto alternativo de administración, supeditado a análisis de heurística por Fail2Ban. |
+| **Servicio SSH (Dropbear)** | `tailscale0` | 2222 | Puerto alternativo de administración, alcanzable únicamente a través de la interfaz `tailscale0` (bloqueo externo por iptables) y supeditado a análisis de heurística por Fail2Ban. |
 | **Proxy Inverso (Nginx)** | `0.0.0.0` | 8443 | Terminación TLS (1.2/1.3), inyección de cabeceras de seguridad y autenticación básica HTTP. |
 | **Core de la API (Gunicorn)** | `127.0.0.1` | 5000 | Aislamiento estricto en interfaz de Loopback. Inaccesible a peticiones externas directas. |
 
@@ -95,6 +115,8 @@ El repositorio incorpora un conjunto de scripts ejecutables dentro del directori
 * `./mcp_tools/check_connections`: Mapea los sockets de red abiertos en interfaces de escucha.
 * `./mcp_tools/show_history`: Extrae resúmenes estadísticos de la base de datos analítica SQLite.
 
+> **Aviso:** algunas herramientas antiguas fueron movidas a `legacy/mcp_tools/` y `legacy/scripts/` por deuda técnica. El directorio `legacy/` **no tiene soporte** y no debe usarse en producción.
+
 ### 5.4. Estructura del Repositorio
 
 ```
@@ -103,7 +125,9 @@ edge-sec-agent/
 │   ├── agent.py              # Motor principal de análisis de seguridad
 │   ├── sec_web.py            # Aplicación Flask (endpoints REST)
 │   └── database.py           # Persistencia SQLite + retención automática
-├── mcp_tools/                # Herramientas de diagnóstico ejecutables
+├── mcp_tools/                # Herramientas de diagnóstico ejecutables (soporte)
+│   ├── audit                 # Auditoría rápida de seguridad
+│   ├── backup                # Backup local con verificación
 │   ├── check_disk            # Uso de disco y espacio disponible
 │   ├── check_cpu             # Carga de CPU y core count
 │   ├── check_ram             # Uso de memoria RAM
@@ -111,14 +135,23 @@ edge-sec-agent/
 │   ├── check_connections     # Conexiones de red activas
 │   ├── check_updates         # Actualizaciones de sistema pendientes
 │   ├── check_processes       # Procesos en ejecución
+│   ├── custom-report         # Informe personalizado
+│   ├── forensic-snapshot     # Snapshot forense del sistema
+│   ├── logger                # Registro de eventos
+│   ├── security-score        # Puntuación de seguridad
 │   ├── show_history          # Historial de métricas de seguridad
 │   └── log-analyzer          # Análisis de logs del sistema
+├── legacy/                   # Herramientas NO soportadas (deuda técnica)
+│   ├── mcp_tools/            # stubs antiguos (saludo, vuln-scan, harden, ...)
+│   └── scripts/              # scripts legacy (remote_deploy.sh, security_audit.sh, ...)
 ├── scripts/
 │   ├── sec                   # CLI principal del agente
 │   ├── sec-agent             # Wrapper de ejecución del agente
 │   ├── sec-chat              # CLI para chat y herramientas MCP
-│   ├── remote_deploy.sh      # Script de despliegue automatizado (7 pasos)
-│   └── security_audit.sh     # Auditoría automatizada de 5 controles perimetrales
+│   ├── apply_firewall.sh     # Aplicación idempotente de reglas (IPv4 + IPv6)
+│   ├── bootstrap_debian_arm64.sh  # Bootstrap reproducible en Debian ARM64
+│   ├── update_safe.sh        # Actualización segura opt-in (lock + health + rollback)
+│   └── ...                   # health_check.sh, backup_state.sh, restore_state.sh
 ├── tests/
 │   └── live_demo_trigger.ps1 # Simulación de ataque fuerza bruta (PowerShell 5.1)
 ├── docs/
@@ -139,9 +172,23 @@ edge-sec-agent/
 └── README.md                 # Documentación técnica (este archivo)
 ```
 
+### 5.5. Endpoints REST disponibles
+
+| Método | Ruta | Descripción |
+| :--- | :--- | :--- |
+| GET | `/` | Página índice mínima. |
+| GET | `/v1/global/health` | Health check JSON (estado de SQLite y Ollama). |
+| GET | `/metrics` | Métricas en formato Prometheus. |
+| GET | `/api/metrics` | Métricas de seguridad calculadas en vivo (`score`, `ssh_failures`, `open_ports`, `temp_c`, `ram_percent`). |
+| GET | `/v1/models` | Lista de modelos disponibles (formato OpenAI). |
+| POST | `/v1/chat/completions` | Chat/completions; ejecuta el agente de seguridad y devuelve el informe. |
+| POST | `/ask` | Consulta restringida a informes de seguridad del sistema. |
+
+Todos los endpoints quedan expuestos a través de Nginx (`:8443`) con TLS y Basic Auth.
+
 ---
 
-**Especificaciones de Entorno:** Hardware: Orange Pi Zero 3 (ARM64) | Sistema Operativo: DietPi v12 (Debian Bookworm) | Estado del Entorno: Producción Verificada.
+**Especificaciones de Entorno:** Hardware: Orange Pi Zero 3 (ARM64) | Sistema Operativo: Debian 13 (trixie) | Estado del Entorno: Producción Verificada.
 
 ## 6. Operación reproducible y mantenible (nuevo)
 
@@ -190,4 +237,4 @@ Puntos clave:
 
 ---
 
-**Especificaciones de Entorno:** Hardware: Orange Pi Zero 3 (ARM64) | Sistema Operativo: DietPi v12 (Debian Bookworm) | Estado del Entorno: Producción Verificada.
+**Especificaciones de Entorno:** Hardware: Orange Pi Zero 3 (ARM64) | Sistema Operativo: Debian 13 (trixie) | Estado del Entorno: Producción Verificada.

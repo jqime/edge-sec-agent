@@ -216,7 +216,7 @@ Este repositorio evidencea dominio en las siguientes áreas, directamente alinea
 |:------------|:----------------------------|
 | **Linux Hardening** | Deshabilitación de SSH en puerto 22, reglas iptables DROP (IPv4+IPv6), configuración segura de Dropbear, eliminación de servicios de desarrollo expuestos. |
 | **Reverse Proxying** | Configuración de Nginx como proxy inverso con `client_max_body_size`, buffers de timeout, logging estructurado y aislamiento de backend en loopback. |
-| **Automatización Bash (Atomic Scripts)** | `remote_deploy.sh`: script idempotente de 7 pasos con `set -euo pipefail`, gestión de entornos virtuales Python, inyección de systemd units y protección anti-lockout. |
+| **Automatización Bash (Atomic Scripts)** | `legacy/scripts/remote_deploy.sh` (movido a `legacy/`, no soportado): script idempotente de 7 pasos con `set -euo pipefail`, gestión de entornos virtuales Python, inyección de systemd units y protección anti-lockout. |
 | **Monitorización Embebida** | Endpoints scrapeables por Prometheus (`/metrics`), health checks JSON estructurados (`/v1/global/health`), lectura directa de sensores de hardware (`/sys/class/thermal`, `/proc/meminfo`). |
 | **Modelos de Persistencia Resilientes** | SQLite con política de retención automática (`prune_old_metrics`), diseñada para mitigar la degradación de celdas NAND en MicroSD. |
 | **WSGI Production Deployment** | Migración de Flask dev server a Gunicorn con workers múltiples, gestión de ciclo de vida via systemd (`Restart=always`, `RestartSec=5`). |

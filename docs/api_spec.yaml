@@ -2,8 +2,19 @@ openapi: 3.0.3
 info:
   title: Edge Security Agent API
   description: Contrato de servicios REST para el monitoreo de métricas analíticas de seguridad perimetral.
-  version: 1.0.0
+  version: 1.1.0
 paths:
+  /:
+    get:
+      summary: Página índice
+      description: Página HTML mínima de presentación del servicio.
+      responses:
+        '200':
+          description: HTML de índice.
+          content:
+            text/html:
+              schema:
+                type: string
   /v1/global/health:
     get:
       summary: Endpoint de Health Check
@@ -11,6 +22,30 @@ paths:
       responses:
         '200':
           description: Nodo operativo y saludable.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  device:
+                    type: string
+                  environment:
+                    type: string
+                  status:
+                    type: string
+                  dependencies:
+                    type: object
+                    properties:
+                      sqlite_ok:
+                        type: boolean
+                      sqlite_detail:
+                        type: string
+                      sqlite_latency_ms:
+                        type: number
+                      ollama_ok:
+                        type: boolean
+                      ollama_latency_ms:
+                        type: number
         '401':
           description: Credenciales inválidas o ausentes.
   /metrics:
@@ -20,10 +55,121 @@ paths:
       responses:
         '200':
           description: Métricas consumidas con éxito.
+          content:
+            text/plain:
+              schema:
+                type: string
   /api/metrics:
     get:
-      summary: Historial Analítico de Métricas
-      description: Retorna el histórico agregado de eventos de seguridad perimetral almacenados en SQLite.
+      summary: Métricas de seguridad (cálculo en vivo)
+      description: Calcula y retorna en tiempo real la puntuación de seguridad y métricas asociadas (no es un histórico agregado). Requiere autenticación básica.
       responses:
         '200':
           description: Datos serializados en formato JSON.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  score:
+                    type: integer
+                  ssh_failures:
+                    type: integer
+                  open_ports:
+                    type: array
+                    items:
+                      type: string
+                  temp_c:
+                    type: number
+                  ram_percent:
+                    type: number
+  /v1/models:
+    get:
+      summary: Lista de modelos disponibles
+      description: Retorna los modelos de lenguaje disponibles en formato compatible con OpenAI.
+      responses:
+        '200':
+          description: Lista de modelos.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        object:
+                          type: string
+  /v1/chat/completions:
+    post:
+      summary: Chat/Completions
+      description: Ejecuta el agente de seguridad y devuelve el informe resultante en formato compatible con OpenAI.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                model:
+                  type: string
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                      content:
+                        type: string
+                stream:
+                  type: boolean
+      responses:
+        '200':
+          description: Respuesta con el informe de seguridad.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  choices:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        message:
+                          type: object
+                          properties:
+                            role:
+                              type: string
+                            content:
+                              type: string
+  /ask:
+    post:
+      summary: Consulta de seguridad restringida
+      description: Consulta restringida a informes de seguridad del sistema (no responde preguntas arbitrarias).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pregunta:
+                  type: string
+      responses:
+        '200':
+          description: Informe de seguridad del sistema.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  respuesta:
+                    type: string

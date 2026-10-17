@@ -2,14 +2,14 @@
 
 ## Estado actual
 
-- Última sesión: 2026-10-10
-- Rama: chore/reconcile-agent-prompts
-- Último commit: 15b3a2b
-- Estado del repositorio: commit y push completados (chore/reconcile-agent-prompts)
+- Última sesión: 2026-10-17
+- Rama: main
+- Último commit: 8d936a1 (LOTE 7)
+- Estado del repositorio: sincronizado con origin/main; LOTE 8 (docs) en curso
 - Estado de la Orange Pi: VERIFICADA EN HARDWARE
-- Estado CI: NO VERIFICADO EN ESTE ENTORNO
-- Tests: 38 passed, coverage 52%
-- Riesgos abiertos: 2 hallazgos de producción pendientes (firewall hardening, sec-agent comando chat) — documentados
+- Estado CI: VERDE (x86_64; ARM64 nativo pendiente)
+- Tests: 49 passed (+1 deselected), coverage 55%
+- Riesgos abiertos: purga histórica de secretos en Git; CI ARM64 nativo
 
 ---
 
@@ -1062,3 +1062,48 @@ Retomar el proyecto `edge-sec-agent` tras PR #4 fusionado, ejecutar los pendient
 #### Estado final
 
 VALIDACIÓN LOCAL COMPLETADA — todos los checks passing; Orange Pi no verificada en hardware.
+
+### Sesión 2026-10-17 — Remediación por lotes (LOTEs 1-7)
+
+#### Objetivo
+
+Ejecutar la remediación priorizada por lotes tras la auditoría de producción: secretos, chat, firewall, rutas systemd-safe, release `v1.1.0`, timers y limpieza de legacy.
+
+#### Cerrados
+
+- **LOTE 1**: rotación de token Telegram + password Basic Auth; eliminación de literal `REDACTED` de `tests/live_demo_trigger.ps1`; `.gitignore` endurecido.
+- **LOTE 2**: fix `/v1/chat/completions` y `/ask` (usan `_SECURE_AGENT_SCRIPT` real en lugar del literal); `SECRETS_PATH` systemd-safe; tests cómplices reescritos.
+- **LOTE 3**: firewall persistente IPv4 + IPv6 (unit `edge-firewall` idempotente); CI sustituye path antes de `systemd-analyze verify`.
+- **LOTE 4**: `SECRETS_PATH` derivado de `__file__`; jerarquía de rutas documentada en `docs/OPERATIONS.md`.
+- **LOTE 5**: `stable` fast-forward a `main`; tag `v1.1.0`; PR #4 **pendiente de cierre manual** (contenido ya en `main`; head `8a77256` es ancestro).
+- **LOTE 6**: timers `edge-sec-agent-health.timer` y `edge-sec-agent-backup.timer` activos; `update.timer` opt-in (OFF); staging retirado; units alineados con runtime.
+- **LOTE 7**: `legacy/` (14 ficheros movidos con `git mv`); 7 `mcp_tools` reescritos a rutas derivadas (`pwd -P`); 3 bugs preexistentes corregidos (`source secrets.env` abortaba por `$apr1$`, `sec-chat` apuntaba a `scripts/mcp_tools/`, `check_cpu` nunca alertaba).
+
+#### Riesgos resueltos
+
+- R1 (token Telegram en histórico): rotado (purga del histórico pendiente).
+- R2 (password Basic Auth): rotada.
+- R3 (chat roto): arreglado y verificado en producción.
+- R4 (iptables no persistente): unit `edge-firewall`.
+- R5 (IPv6 sin reglas): espejo IPv4.
+- R6 (rutas `/root`): `SECRETS_PATH` derivado.
+- R7 (`secrets.env` 644): 600.
+- R9 (PR #4 obsoleto): contenido en `main`; cierre manual pendiente.
+- R12 (`stable` atrasado): fast-forward a `main`.
+- R13 (README desactualizado): actualizado en esta sesión (LOTE 8).
+
+#### Validación
+
+- pytest 49 passed (+1 deselected); ruff 0; mypy OK; compileall OK; `bash -n` 42/42.
+- CI GitHub Actions: `7adba5e` success, `8d936a1` success.
+- Producción `:5000` HEALTHY; `systemctl --failed` = 0.
+
+#### Pendiente
+
+- Purga histórica de secretos en Git (secretos presentes en el histórico).
+- CI ARM64 nativo.
+- Cruft de raíz (`AGENTS.md.bak.*`, `OPENCODE_EDGE_SEC_AGENT_MASTER_PROMPT.md`, `health_check.sh` duplicado, `__pycache__/`, `update.lock`) — fuera de scope.
+
+#### Estado final
+
+LOTEs 1-7 CERRADOS (CI verde). LOTE 8 (documentación) en curso.
