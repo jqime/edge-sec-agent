@@ -48,3 +48,8 @@ config/*.env
 update.lock
 # *.bak.* — backups manuales de ficheros
 *.bak.*
+
+# Cowrie honeypot — estado runtime de alertas
+data/cowrie_alert.state
+data/cowrie_alert.seen
+data/cowrie_alert.lock

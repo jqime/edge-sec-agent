@@ -73,6 +73,7 @@ The complete topology diagram is available at [docs/architecture.txt](docs/archi
 - **Fail2Ban**: custom jails for `sshd` and `nginx-http-auth`.
 - **Firewall**: idempotent persistence via `edge-firewall.service`, applied over both IPv4 and IPv6.
 - **SSH**: port 22 is dropped at the kernel level; administration is restricted to Dropbear on the `tailscale0` interface.
+- **Honeypot**: an isolated Cowrie SSH sensor on `:2223` (dedicated user and directory) records attacker credentials and commands and dispatches alerts to Telegram. See [docs/HONEYPOT.md](docs/HONEYPOT.md).
 
 ### Edge AI and Observability
 

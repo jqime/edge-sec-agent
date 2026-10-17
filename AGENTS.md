@@ -2,14 +2,15 @@
 
 ## Estado actual
 
-- Última sesión: 2026-10-17
+- Última sesión: 2026-10-17 (Honeypot Cowrie)
 - Rama: main
-- Último commit: 8d936a1 (LOTE 7)
-- Estado del repositorio: sincronizado con origin/main; LOTE 8 (docs) en curso
+- Último commit: 7645be6 (README enterprise)
+- Estado del repositorio: sincronizado con origin/main; Honeypot (Cowrie) instalado SIN commitear
 - Estado de la Orange Pi: VERIFICADA EN HARDWARE
-- Estado CI: VERDE (x86_64; ARM64 nativo pendiente)
+- Estado CI: VERDE (x86_64 + ARM64 nativo)
 - Tests: 49 passed (+1 deselected), coverage 55%
-- Riesgos abiertos: purga histórica de secretos en Git; CI ARM64 nativo
+- Honeypot: `cowrie.service` active/enabled en `:2223`; alertas Telegram `scripts/cowrie_alert.sh`
+- Riesgos abiertos: timer de alertas pendiente; endpoint `/api/honeypot` opcional; CI ARM64 estable
 
 ---
 
@@ -1107,3 +1108,42 @@ Ejecutar la remediación priorizada por lotes tras la auditoría de producción:
 #### Estado final
 
 LOTEs 1-7 CERRADOS (CI verde). LOTE 8 (documentación) en curso.
+
+---
+
+### Sesión 2026-10-17 — Honeypot Cowrie (SSH)
+
+#### Objetivo
+Desplegar un Honeypot SSH (Cowrie) aislado y alertas Telegram, sentando base para un futuro RAG.
+
+#### Decisiones previas (consultadas al owner)
+- Memoria: continuar **sin swap/ZRAM** (Cowrie ligero, ~40MB).
+- Red: **firewall intacto**; `2223` sin regla (alcanzable en LAN/Tailscale).
+
+#### Cambios realizados
+- Usuario `cowrie` (uid 993, cuenta bloqueada) + `/opt/cowrie`.
+- Cowrie `0.1.dev1+gc7773f497` clonado en `/opt/cowrie/cowrie-git`; venv en `/opt/cowrie/venv`; `pip check` OK.
+- `etc/cowrie.cfg`: `[ssh] listen_endpoints = tcp:2223:interface=0.0.0.0`; `[output_jsonlog] enabled=true`; telnet off.
+- `etc/userdb.txt`: credenciales FALSAS (root/123456, admin/admin, ...) → captura de comandos.
+- `cowrie.service` (systemd, User=cowrie) creado, `enable --now`; `systemd-analyze verify` OK.
+- `scripts/cowrie_alert.sh` (nuevo, rutas derivadas, anti-spam por IP, flock, `COWRIE_ALERT_DEBUG`).
+- Backup previo: `/var/backups/edge-sec-agent/systemd-pre-cowrie-20261017-204841.tar.gz`.
+- Docs: `docs/HONEYPOT.md` (nuevo); este registro; README (Key Features).
+
+#### Evidencia
+- `systemctl is-active cowrie` → active; `ss -tlnp` → `0.0.0.0:2223` (twistd, 40.4M RAM).
+- Ataque simulado (`sshpass`, credenciales falsas) → `cowrie.login.failed`, `cowrie.login.success`, `cowrie.command.input`.
+- Anti-spam: 15 eventos → 1 alerta; eventos nuevos misma IP → suprimidos.
+- Telegram: respuesta API `{"ok":true,"message_id":1328}`.
+- `bash -n scripts/cowrie_alert.sh` → OK.
+
+#### Aislamiento
+Cowrie **no** toca `:2222` (Dropbear), `:5000` (API), nginx, Tailscale ni el firewall. Usuario y directorio dedicados.
+
+#### Pendiente (requiere autorización)
+- Timer `cowrie-alert.timer` para alertas automáticas.
+- Endpoint `/api/honeypot` (opcional, toca `src/sec_web.py`).
+- Endurecimiento systemd de la unit (ProtectSystem/ProtectHome/NoNewPrivileges).
+
+#### Estado final
+Honeypot operativo y verificado. **Sin commit ni push** (a la espera del owner).
