@@ -102,7 +102,7 @@ PY
 Uso manual:
 
 ```bash
-sudo -u edgesec /opt/edge-sec-agent/scripts/cowrie_alert.sh
+sudo -u edgesec /opt/edge-sec-agent/app/current/scripts/cowrie_alert.sh
 ```
 
 ## Verificación realizada
