@@ -69,9 +69,15 @@ run_cmd "$APP_DIR/scripts/backup_state.sh"
 
 if [[ "$DRY_RUN" -eq 0 ]]; then
   timeout "$TIMEOUT_SEC" python3 -m compileall "$APP_DIR/src"
-  timeout "$TIMEOUT_SEC" "$APP_DIR/.venv/bin/ruff" check "$APP_DIR/src" "$APP_DIR/tests"
-  timeout "$TIMEOUT_SEC" "$APP_DIR/.venv/bin/mypy" "$APP_DIR/src" --ignore-missing-imports
-  timeout "$TIMEOUT_SEC" "$APP_DIR/.venv/bin/pytest" "$APP_DIR/tests" -q
+  VENV_DIR="$INSTALL_ROOT/app/venv"
+  if [[ ! -x "$VENV_DIR/bin/ruff" || ! -x "$VENV_DIR/bin/mypy" || ! -x "$VENV_DIR/bin/pytest" ]]; then
+    echo "Entorno de validación incompleto: $VENV_DIR" >&2
+    git -C "$APP_DIR" reset --hard "$OLD_SHA" >/dev/null 2>&1
+    exit 1
+  fi
+  timeout "$TIMEOUT_SEC" "$VENV_DIR/bin/ruff" check "$APP_DIR/src" "$APP_DIR/tests"
+  timeout "$TIMEOUT_SEC" "$VENV_DIR/bin/mypy" "$APP_DIR/src" --ignore-missing-imports
+  timeout "$TIMEOUT_SEC" "$VENV_DIR/bin/pytest" "$APP_DIR/tests" -q
 fi
 
 run_cmd systemctl restart "$SERVICE_NAME"

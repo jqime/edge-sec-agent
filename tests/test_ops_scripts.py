@@ -16,6 +16,7 @@ def test_new_scripts_have_valid_bash_syntax():
         root / "scripts/restore_state.sh",
         root / "scripts/health_watchdog.sh",
         root / "scripts/update_safe.sh",
+        root / "install.sh",
     ]
     for script in scripts:
         result = subprocess.run(["bash", "-n", str(script)], capture_output=True, text=True, check=False)

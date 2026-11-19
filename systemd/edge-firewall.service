@@ -8,8 +8,8 @@ Wants=network-online.target
 Type=oneshot
 RemainAfterExit=yes
 User=root
-ExecStart=/opt/edge-sec-agent/scripts/apply_firewall.sh
-ExecStop=/opt/edge-sec-agent/scripts/apply_firewall.sh --remove
+ExecStart=/opt/edge-sec-agent/app/current/scripts/apply_firewall.sh
+ExecStop=/opt/edge-sec-agent/app/current/scripts/apply_firewall.sh --remove
 
 [Install]
 WantedBy=multi-user.target

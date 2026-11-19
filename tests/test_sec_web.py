@@ -5,6 +5,8 @@ from unittest.mock import patch
 
 import pytest
 
+import src.sec_web
+
 
 @pytest.fixture(autouse=True)
 def _isolate_db():
@@ -151,6 +153,34 @@ class TestModels:
         assert data["object"] == "list"
         assert len(data["data"]) == 1
         assert data["data"][0]["id"] == "sec-agent"
+
+
+class TestHoneypotSummary:
+    def test_summary_does_not_expose_credentials_or_commands(self, client, tmp_path):
+        log = tmp_path / "cowrie.json"
+        log.write_text(
+            '{"eventid":"cowrie.login.failed","src_ip":"192.0.2.10","password":"secret"}\n'
+            '{"eventid":"cowrie.login.success","src_ip":"192.0.2.10","password":"secret"}\n'
+            '{"eventid":"cowrie.command.input","src_ip":"192.0.2.10","input":"whoami"}\n',
+            encoding="utf-8",
+        )
+        os.environ["COWRIE_LOG"] = str(log)
+        src.sec_web._cache.pop("honeypot_summary", None)
+        try:
+            resp = client.get("/api/honeypot/summary")
+            data = resp.get_json()
+            assert resp.status_code == 200
+            assert data["available"] is True
+            assert data["failed_logins"] == 1
+            assert data["successful_logins"] == 1
+            assert data["command_events"] == 1
+            assert data["unique_source_ips"] == ["192.0.2.10"]
+            serialized = str(data)
+            assert "secret" not in serialized
+            assert "whoami" not in serialized
+        finally:
+            os.environ.pop("COWRIE_LOG", None)
+            src.sec_web._cache.pop("honeypot_summary", None)
 
 
 # ── / and dashboard ──────────────────────────────────────────────────────

@@ -117,6 +117,7 @@ REPORTS_DIR="$INSTALL_ROOT/reports"
 BACKUPS_DIR="$INSTALL_ROOT/backups"
 CONFIG_DIR="$INSTALL_ROOT/config"
 LOG_DIR="$INSTALL_ROOT/logs"
+VENV_DIR="$INSTALL_ROOT/app/venv"
 
 mkdir -p "$DATA_DIR" "$REPORTS_DIR" "$BACKUPS_DIR" "$CONFIG_DIR" "$LOG_DIR" "$(dirname "$APP_DIR")"
 
@@ -138,9 +139,12 @@ else
   fi
 fi
 
-python3 -m venv "$INSTALL_ROOT/app/venv"
-"$INSTALL_ROOT/app/venv/bin/pip" install --upgrade pip >/dev/null 2>&1
-"$INSTALL_ROOT/app/venv/bin/pip" install -r "$APP_DIR/requirements.txt" >/dev/null 2>&1
+python3 -m venv "$VENV_DIR"
+"$VENV_DIR/bin/pip" install --upgrade pip >/dev/null 2>&1
+"$VENV_DIR/bin/pip" install -r "$APP_DIR/requirements.txt" >/dev/null 2>&1
+if [[ -f "$APP_DIR/requirements-dev.txt" ]]; then
+  "$VENV_DIR/bin/pip" install -r "$APP_DIR/requirements-dev.txt" >/dev/null 2>&1
+fi
 
 ENV_FILE="$CONFIG_DIR/edge-sec-agent.env"
 # Solo crea el archivo de entorno si no existe ya (no sobrescribir configuración)
@@ -167,6 +171,32 @@ SD_HEALTH_SERVICE="/etc/systemd/system/edge-sec-agent-health.service"
 SD_HEALTH_TIMER="/etc/systemd/system/edge-sec-agent-health.timer"
 SD_UPDATE_SERVICE="/etc/systemd/system/edge-sec-agent-update.service"
 SD_UPDATE_TIMER="/etc/systemd/system/edge-sec-agent-update.timer"
+SD_FIREWALL_SERVICE="/etc/systemd/system/edge-firewall.service"
+
+# Instalar units de forma reproducible. No modifica units si su contenido coincide.
+if [[ "$DRY_RUN" -eq 0 ]]; then
+  install -m 0644 "$APP_DIR/systemd/edge-sec-agent.service" "$SD_SERVICE"
+  install -m 0644 "$APP_DIR/systemd/edge-sec-agent-backup.service" "$SD_BACKUP_SERVICE"
+  install -m 0644 "$APP_DIR/systemd/edge-sec-agent-backup.timer" "$SD_BACKUP_TIMER"
+  install -m 0644 "$APP_DIR/systemd/edge-sec-agent-health.service" "$SD_HEALTH_SERVICE"
+  install -m 0644 "$APP_DIR/systemd/edge-sec-agent-health.timer" "$SD_HEALTH_TIMER"
+  install -m 0644 "$APP_DIR/systemd/edge-sec-agent-update.service" "$SD_UPDATE_SERVICE"
+  install -m 0644 "$APP_DIR/systemd/edge-sec-agent-update.timer" "$SD_UPDATE_TIMER"
+  install -m 0644 "$APP_DIR/systemd/edge-firewall.service" "$SD_FIREWALL_SERVICE"
+
+  for unit in edge-sec-agent.service edge-sec-agent-backup.service edge-sec-agent-backup.timer \
+              edge-sec-agent-health.service edge-sec-agent-health.timer \
+              edge-sec-agent-update.service edge-sec-agent-update.timer edge-firewall.service; do
+    systemd-analyze verify "/etc/systemd/system/$unit" >/dev/null 2>&1 ||
+      echo "Advertencia: $unit falló verification" >&2
+  done
+
+  systemctl daemon-reload
+  systemctl enable edge-sec-agent.service edge-sec-agent-backup.timer edge-sec-agent-health.timer \
+                   edge-firewall.service
+  systemctl enable --now edge-firewall.service
+  systemctl restart edge-sec-agent.service
+fi
 
 # Verify systemd units exist and are valid (dry-run or actual install)
 if [[ "$DRY_RUN" -eq 0 ]]; then

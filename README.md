@@ -94,6 +94,15 @@ The complete topology diagram is available at [docs/architecture.txt](docs/archi
 
 Requirements: ARM64 hardware, Debian 13 (trixie) or DietPi, and root access for provisioning.
 
+Una sola línea descarga el instalador de la rama `stable`, prepara el código,
+crea el entorno Python, instala y activa los servicios principales:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jqime/edge-sec-agent/main/install.sh | sudo bash -s stable
+```
+
+Para una instalación manual desde el repositorio:
+
 ```bash
 git clone https://github.com/jqime/edge-sec-agent.git
 cd edge-sec-agent
