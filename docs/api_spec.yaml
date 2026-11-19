@@ -97,6 +97,15 @@ paths:
                 properties:
                   object:
                     type: string
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        object:
+                          type: string
   /api/honeypot/summary:
     get:
       summary: Resumen agregado del honeypot
@@ -123,15 +132,6 @@ paths:
                     type: array
                     items:
                       type: string
-                  data:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: string
-                        object:
-                          type: string
   /v1/chat/completions:
     post:
       summary: Chat/Completions
