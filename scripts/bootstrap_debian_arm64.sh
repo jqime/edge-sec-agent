@@ -118,6 +118,16 @@ BACKUPS_DIR="$INSTALL_ROOT/backups"
 CONFIG_DIR="$INSTALL_ROOT/config"
 LOG_DIR="$INSTALL_ROOT/logs"
 VENV_DIR="$INSTALL_ROOT/app/venv"
+LEGACY_LAYOUT=0
+
+# Compatibilidad con instalaciones anteriores que tienen el checkout y el venv
+# directamente bajo INSTALL_ROOT. Se conservan y se exponen mediante symlinks
+# en el layout canónico sin mover datos ni secretos durante el bootstrap.
+if [[ -d "$INSTALL_ROOT/.git" && ! -e "$INSTALL_ROOT/app/current" ]]; then
+  APP_DIR="$INSTALL_ROOT"
+  VENV_DIR="$INSTALL_ROOT/venv"
+  LEGACY_LAYOUT=1
+fi
 
 mkdir -p "$DATA_DIR" "$REPORTS_DIR" "$BACKUPS_DIR" "$CONFIG_DIR" "$LOG_DIR" "$(dirname "$APP_DIR")"
 
@@ -139,6 +149,12 @@ else
   fi
 fi
 
+if [[ "$LEGACY_LAYOUT" -eq 1 ]]; then
+  mkdir -p "$INSTALL_ROOT/app"
+  ln -sfn "$INSTALL_ROOT" "$INSTALL_ROOT/app/current"
+  ln -sfn "$INSTALL_ROOT/venv" "$INSTALL_ROOT/app/venv"
+fi
+
 python3 -m venv "$VENV_DIR"
 "$VENV_DIR/bin/pip" install --upgrade pip >/dev/null 2>&1
 "$VENV_DIR/bin/pip" install -r "$APP_DIR/requirements.txt" >/dev/null 2>&1
@@ -152,6 +168,8 @@ if [[ ! -f "$ENV_FILE" ]]; then
   cat > "$ENV_FILE" <<ENV
 EDGE_DB_PATH=$DATA_DIR/history.db
 REPORTS_DIR=$REPORTS_DIR
+EDGE_REPORTS_DIR=$REPORTS_DIR
+EDGE_SECRETS_PATH=$INSTALL_ROOT/secrets.env
 EDGE_MODEL=tinyllama:1.1b
 EDGE_UPDATE_CHANNEL=$CHANNEL
 EDGE_INSTALL_ROOT=$INSTALL_ROOT

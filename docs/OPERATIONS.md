@@ -44,6 +44,11 @@ sudo /opt/edge-sec-agent/app/current/scripts/bootstrap_debian_arm64.sh \
 
 El bootstrap valida arquitectura/memoria/espacio, crea `edgesec`, instala dependencias mínimas, prepara rutas persistentes, instala units de systemd y **no borra** datos existentes.
 
+En instalaciones anteriores con el checkout directamente en
+`/opt/edge-sec-agent`, el bootstrap crea enlaces de compatibilidad hacia
+`app/current` y `app/venv`. No mueve ni elimina el código, la configuración, los
+secretos ni los datos existentes.
+
 ## Servicios systemd
 
 Units del repositorio (`systemd/`) y estado esperado en el host:
