@@ -1,0 +1,5 @@
+[allowlist]
+description = "Historical placeholder rotated before v1.1.0"
+commits = [
+  "c019a3facfdd508acf79811c3964b97e0cbcd3a0",
+]
