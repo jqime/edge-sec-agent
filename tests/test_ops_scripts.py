@@ -103,6 +103,7 @@ def test_health_watchdog_restart_path_is_safe_with_mock_restart(tmp_path: Path):
     env["PATH"] = f"{bin_dir}{os.pathsep}{env.get('PATH', '')}"
     env["MOCK_SYSTEMCTL_LOG"] = str(call_log)
     env.pop("EDGE_RESTART_CMD", None)
+    env["EDGE_METRIC_COLLECTION"] = "0"
 
     result = subprocess.run([str(script)], env=env, capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stderr
@@ -114,3 +115,39 @@ def test_health_watchdog_restart_path_is_safe_with_mock_restart(tmp_path: Path):
     script_content = script.read_text(encoding="utf-8")
     for forbidden in ("EDGE_RESTART_CMD", "$RESTART_CMD", "eval", "bash -c", "sh -c"):
         assert forbidden not in script_content, f"prohibido en watchdog: {forbidden}"
+
+
+def test_health_watchdog_collects_metric_as_service_user(tmp_path: Path):
+    script = _repo_root() / "scripts/health_watchdog.sh"
+
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    call_log = tmp_path / "runuser-calls.log"
+
+    mock_runuser = bin_dir / "runuser"
+    mock_runuser.write_text(
+        '#!/usr/bin/env bash\nprintf "%s\\n" "$*" > "$MOCK_RUNUSER_LOG"\nexit 0\n',
+        encoding="utf-8",
+    )
+    mock_runuser.chmod(0o755)
+
+    sec_agent = tmp_path / "sec-agent"
+    sec_agent.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    sec_agent.chmod(0o755)
+
+    env = os.environ.copy()
+    env["EDGE_METRIC_COLLECTION"] = "1"
+    env["EDGE_SEC_AGENT_SCRIPT"] = str(sec_agent)
+    env["EDGE_DB_PATH"] = str(tmp_path / "history.db")
+    env["EDGE_REPORTS_DIR"] = str(tmp_path / "reports")
+    env["EDGE_HEALTH_URL"] = "http://127.0.0.1:9/unreachable"
+    env["PATH"] = f"{bin_dir}{os.pathsep}{env.get('PATH', '')}"
+    env["MOCK_RUNUSER_LOG"] = str(call_log)
+
+    result = subprocess.run([str(script)], env=env, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
+    assert call_log.exists()
+    args = call_log.read_text(encoding="utf-8").strip()
+    assert args.startswith("-u edgesec -- env ")
+    assert "EDGE_DB_PATH=" in args
+    assert "--security --json" in args
