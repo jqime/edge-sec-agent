@@ -7,5 +7,5 @@ Wants=cowrie.service
 Type=oneshot
 User=edgesec
 Group=edgesec
-WorkingDirectory=/opt/edge-sec-agent
-ExecStart=/opt/edge-sec-agent/scripts/cowrie_alert.sh
+WorkingDirectory=/opt/edge-sec-agent/app/current
+ExecStart=/opt/edge-sec-agent/app/current/scripts/cowrie_alert.sh

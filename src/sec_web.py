@@ -10,6 +10,7 @@ Endpoints:
   /ask                → legacy chat
   /                   → dashboard mínimo
 """
+import json
 import logging
 import os
 import re
@@ -208,6 +209,66 @@ def _last_update_info() -> dict[str, Any]:
     return _cached("last_update", 15, _loader)
 
 
+def _honeypot_summary() -> dict[str, Any]:
+    """Lee eventos Cowrie agregados sin exponer credenciales ni texto de comandos."""
+    def _loader() -> dict[str, Any]:
+        log_path = os.environ.get(
+            "COWRIE_LOG",
+            "/opt/cowrie/cowrie-git/var/log/cowrie/cowrie.json",
+        )
+        summary: dict[str, Any] = {
+            "available": False,
+            "events": 0,
+            "failed_logins": 0,
+            "successful_logins": 0,
+            "command_events": 0,
+            "unique_source_ips": [],
+        }
+        path = Path(log_path)
+        if not path.is_file():
+            return summary
+
+        counts = {
+            "cowrie.login.failed": 0,
+            "cowrie.login.success": 0,
+            "cowrie.command.input": 0,
+        }
+        source_ips: set[str] = set()
+        events = 0
+        try:
+            with path.open("r", encoding="utf-8") as stream:
+                for line in stream:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        event = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    events += 1
+                    event_id = event.get("eventid")
+                    if event_id in counts:
+                        counts[event_id] += 1
+                    source_ip = event.get("src_ip")
+                    if isinstance(source_ip, str) and source_ip:
+                        source_ips.add(source_ip)
+        except (OSError, UnicodeDecodeError) as exc:
+            logger.debug("No se pudo leer el resumen Cowrie: %s", exc)
+            return summary
+
+        summary.update({
+            "available": True,
+            "events": events,
+            "failed_logins": counts["cowrie.login.failed"],
+            "successful_logins": counts["cowrie.login.success"],
+            "command_events": counts["cowrie.command.input"],
+            "unique_source_ips": sorted(source_ips),
+        })
+        return summary
+
+    return _cached("honeypot_summary", 30, _loader)
+
+
 @app.route("/v1/global/health")
 def health() -> tuple[Response, int]:
     """
@@ -363,6 +424,12 @@ def list_models() -> tuple[Response, int]:
         "object": "list",
         "data": [{"id": "sec-agent", "object": "model"}],
     }), 200
+
+
+@app.route("/api/honeypot/summary")
+def honeypot_summary() -> tuple[Response, int]:
+    """Resumen agregado y seguro del honeypot; no devuelve credenciales ni comandos."""
+    return jsonify(_honeypot_summary()), 200
 
 
 @app.route("/v1/chat/completions", methods=["POST"])

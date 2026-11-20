@@ -13,7 +13,7 @@ Este documento define una ruta reproducible para desplegar y operar `edge-sec-ag
 
 | Recurso | Ruta | Notas |
 |---|---|---|
-| Código | `/opt/edge-sec-agent` (actual) / `/opt/edge-sec-agent/app/current` (layout futuro) | Fuente de verdad del despliegue actual |
+| Código | `/opt/edge-sec-agent/app/current` | Fuente de verdad del despliegue |
 | Configuración | `/opt/edge-sec-agent/config/` | `edge-sec-agent.env`, `640 root:edgesec`, sin secretos |
 | Secretos | `/opt/edge-sec-agent/secrets.env` | `600 edgesec:edgesec`, fuera de Git |
 | Datos | `/opt/edge-sec-agent/data/` | SQLite (`history.db`), `ReadWritePaths` del unit |
@@ -44,6 +44,11 @@ sudo /opt/edge-sec-agent/app/current/scripts/bootstrap_debian_arm64.sh \
 
 El bootstrap valida arquitectura/memoria/espacio, crea `edgesec`, instala dependencias mínimas, prepara rutas persistentes, instala units de systemd y **no borra** datos existentes.
 
+En instalaciones anteriores con el checkout directamente en
+`/opt/edge-sec-agent`, el bootstrap crea enlaces de compatibilidad hacia
+`app/current` y `app/venv`. No mueve ni elimina el código, la configuración, los
+secretos ni los datos existentes.
+
 ## Servicios systemd
 
 Units del repositorio (`systemd/`) y estado esperado en el host:
@@ -56,11 +61,10 @@ Units del repositorio (`systemd/`) y estado esperado en el host:
 | `edge-sec-agent-backup.timer` + `.service` | Sí | enabled/active (backup horario) |
 | `edge-sec-agent-update.timer` + `.service` | **No** | **opt-in OFF** (ver sección) |
 
-Los `ExecStart` de los servicios `oneshot` apuntan al layout actual
-(`/opt/edge-sec-agent/scripts/...`); el unit principal usa
-`WorkingDirectory=/opt/edge-sec-agent` y `venv/bin/gunicorn`. **No** se usa el
-layout obsoleto `app/current` + `app/venv` (symlinks rotos a `/root`, ilegibles
-bajo `ProtectHome=true`).
+Los `ExecStart` y `WorkingDirectory` usan el layout canónico
+`/opt/edge-sec-agent/app/current` y el entorno
+`/opt/edge-sec-agent/app/venv`. El bootstrap instala las units desde el
+checkout versionado para evitar rutas antiguas o dependencias de `/root`.
 
 > El unit `edge-sec-agent-staging.service` (`:5001`) fue **retirado**: era un
 > checkout duplicado no versionado. Backup en
@@ -151,9 +155,9 @@ Reglas (IPv4 e IPv6 en espejo):
 Aplicar / simular / revertir:
 
 ```bash
-sudo /opt/edge-sec-agent/scripts/apply_firewall.sh           # aplica (idempotente)
-sudo /opt/edge-sec-agent/scripts/apply_firewall.sh --dry-run # simula sin cambiar
-sudo /opt/edge-sec-agent/scripts/apply_firewall.sh --remove  # rollback
+sudo /opt/edge-sec-agent/app/current/scripts/apply_firewall.sh           # aplica (idempotente)
+sudo /opt/edge-sec-agent/app/current/scripts/apply_firewall.sh --dry-run # simula sin cambiar
+sudo /opt/edge-sec-agent/app/current/scripts/apply_firewall.sh --remove  # rollback
 ```
 
 Instalar y activar la persistencia:

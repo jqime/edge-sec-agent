@@ -19,7 +19,7 @@ Consumo medido: pico ~3.0–3.4 GB usados, ~0.5–0.9 GB disponibles; **sin OOM*
 ## Aislamiento
 
 - Venv dedicado: `/opt/edge-sec-agent-rag/venv` (`requests`, `sqlite-vec`, `ollama`).
-- **No toca** el venv de producción (`/opt/edge-sec-agent/venv`) ni `src/`.
+- **No toca** el venv de producción (`/opt/edge-sec-agent/app/venv`) ni `src/`.
 - Script: `scripts/rag_query.py` (solo lectura del log; no escribe en producción).
 - Base de datos: `/opt/edge-sec-agent-rag/cowrie_vec.db`.
 

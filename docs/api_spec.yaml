@@ -106,6 +106,32 @@ paths:
                           type: string
                         object:
                           type: string
+  /api/honeypot/summary:
+    get:
+      summary: Resumen agregado del honeypot
+      description: Retorna contadores y IPs origen agregadas sin credenciales ni comandos capturados.
+      responses:
+        '200':
+          description: Resumen disponible o estado sin datos.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  available:
+                    type: boolean
+                  events:
+                    type: integer
+                  failed_logins:
+                    type: integer
+                  successful_logins:
+                    type: integer
+                  command_events:
+                    type: integer
+                  unique_source_ips:
+                    type: array
+                    items:
+                      type: string
   /v1/chat/completions:
     post:
       summary: Chat/Completions

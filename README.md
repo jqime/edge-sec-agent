@@ -2,97 +2,176 @@
 
 # Edge Security Agent
 
-Autonomous DevSecOps and Perimeter Defense for ARM64 Edge Devices
+**Autonomous perimeter security and DevSecOps observability for ARM64 edge devices**
 
 [![CI](https://github.com/jqime/edge-sec-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/jqime/edge-sec-agent/actions/workflows/ci.yml)
 ![Release](https://img.shields.io/badge/release-v1.1.0-blue)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Platform](https://img.shields.io/badge/platform-ARM64%20%7C%20Debian%2013-lightgrey)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Repo Size](https://img.shields.io/badge/repo_size-1.3_MB-brightgreen)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 </div>
 
-## Overview
+## What it is
 
-Edge Security Agent is a self-contained security appliance for low-resource ARM64 hardware (Orange Pi Zero 3, Debian 13 "trixie"). It provides a hardened reverse proxy, local AI inference through Ollama, Fail2Ban intrusion prevention, and a REST/Prometheus observability surface, with no cloud dependency.
+**Edge Security Agent** is a self-hosted security appliance for low-resource
+ARM64 nodes. It was built for an Orange Pi Zero 3 running Debian 13 and
+combines perimeter hardening, local AI, intrusion detection, honeypot telemetry,
+backup, health monitoring and safe updates on a single device.
 
-### The Journey
+It is designed to keep operational data and inference on the node: the
+administration plane does not require a cloud service and Ollama runs a local
+model for security reporting. External integrations are optional.
 
-The project was audited and remediated across ten tracked workstreams. The remediation path is documented to demonstrate engineering maturity rather than a "clean-room" history.
+## Why it exists
 
-| Area | Before (Audit) | Current State (Verified) |
-|---|---|---|
-| Secrets in Git History | Exposed | 0 traces (Rotated & Purged) |
-| Chat / LLM Endpoint | Broken | Functional (Security Reports) |
-| Firewall | Not persistent, no IPv6 | Persistent IPv4 + IPv6 |
-| CI Pipeline | x86_64 only | x86_64 + Native ARM64 |
-| Repository Size | 51 MB | 1.3 MB (purged history) |
+A conventional microservice or cloud security platform is too expensive for a
+small edge node. This project provides practical, auditable control over a
+homelab or laboratory perimeter while remaining maintainable under constrained
+CPU and RAM.
 
-## Architecture & Topology
+The implementation addresses four problems:
 
+- **Perimeter exposure:** restrict management and administrative ports.
+- **Incident visibility:** collect security scores, failed SSH attempts,
+  Fail2Ban bans and honeypot events.
+- **Operational resilience:** verify health, create backups and roll back unsafe
+  updates.
+- **Local decision support:** generate security reports through a local LLM
+  without sending device data to the cloud.
+
+## Implemented capabilities
+
+### Perimeter hardening
+
+- Nginx TLS 1.2/1.3 termination on port `8443`.
+- HTTP Basic Authentication and a `5 requests/s` rate limit.
+- Security headers including HSTS, `X-Frame-Options`, CSP-friendly framing
+  controls, MIME sniffing protection and referrer policy.
+- Persistent and idempotent IPv4/IPv6 firewall rules.
+- Legacy SSH port `22` blocked.
+- Dropbear administration restricted to the Tailscale interface on port `2222`.
+- Gunicorn and Ollama bound to loopback only.
+- Fail2Ban integration for SSH and Nginx authentication failures.
+- Dedicated Cowrie SSH honeypot on port `2223`.
+
+### Monitoring and observability
+
+- Flask REST API behind Nginx.
+- Prometheus-compatible `/metrics` endpoint.
+- Live security metrics at `/api/metrics`.
+- Structured health endpoint at `/v1/global/health`.
+- SQLite/WAL persistence with 30-day metric retention.
+- CPU temperature, RAM, uptime, SSH failures, open ports and Fail2Ban bans.
+- Build and last-update metadata in metrics.
+- Aggregated Cowrie telemetry without exposing passwords or commands.
+
+### Local edge AI
+
+- Ollama on loopback, with `tinyllama:1.1b` for the production security report.
+- OpenAI-shaped `/v1/models` and `/v1/chat/completions` endpoints.
+- Legacy `/ask` compatibility.
+- Isolated Cowrie RAG CLI using `nomic-embed-text` and `sqlite-vec`.
+- No PyTorch dependency in the RAG environment.
+
+### Automation and recovery
+
+- systemd watchdog every two minutes.
+- Hourly backup timer with SQLite integrity checks.
+- SHA-256 backup manifests and configurable retention.
+- Restore workflow for SQLite and reports.
+- Opt-in, locked safe-update timer.
+- Pre-update validation and health-check based rollback.
+- Explicit protection against updating `main` or `master` without consent.
+
+## Infrastructure topology
+
+```text
+Internet / LAN
+      |
+      v
+Nginx :8443
+TLS + Basic Auth + rate limiting + security headers
+      |
+      v
+Gunicorn :5000
+loopback only
+      |
+      +--> Flask API
+      |       |
+      |       +--> SQLite /opt/edge-sec-agent/data/history.db
+      |       +--> Local reports and backups
+      |
+      +--> Ollama :11434
+              loopback only
+
+Tailscale tailnet
+      |
+      +--> Dropbear :2222
+      +--> Cowrie honeypot :2223
+      +--> Administration endpoints
 ```
-Internet
-    |
-    v
-Nginx :8443  (TLS 1.2/1.3, Basic Auth, rate limiting, hardening headers)
-    |  proxy_pass -> 127.0.0.1:5000
-    v
-Gunicorn :5000  (loopback only)
-    |
-    v
-Flask API  (src/sec_web.py)
-    |
-    +--> Ollama :11434  (loopback, local LLM)
-    |
-    +--> SQLite  (data/history.db, WAL)
 
-Tailscale (tailnet)
-    |
-    v
-Dropbear :2222  (tailscale0 interface only)
+### Network exposure
+
+| Port | Service | Exposure | Controls |
+|---:|---|---|---|
+| `22` | Legacy SSH | None | IPv4/IPv6 `DROP` |
+| `2222` | Dropbear | Tailscale interface | Tailnet-only access |
+| `8443` | Nginx | Configured network interfaces | TLS, authentication, rate limit, headers |
+| `5000` | Gunicorn | `127.0.0.1` | Loopback only |
+| `11434` | Ollama | `127.0.0.1` | Loopback only |
+| `2223` | Cowrie | Tailscale interface | Isolated user, directory and network filtering |
+| `41641/UDP` | Tailscale | Tailnet transport | WireGuard tunnel |
+
+The complete documented topology is in
+[`docs/architecture.txt`](docs/architecture.txt).
+
+## Honesty about deployment status
+
+The following points are based on the device and repository evidence collected
+for this project:
+
+| Area | Verified state |
+|---|---|
+| Repository secrets | Legacy Telegram token and Basic Auth password rotated |
+| Chat report endpoint | Repaired and tested |
+| Firewall | Persistent IPv4/IPv6 rules, without flushing Tailscale chains |
+| CI | x86_64 and native ARM64 matrix |
+| Production host | Orange Pi Zero 3 / Debian 13 validated manually |
+| Honeypot | Cowrie isolated, Tailscale-only, tested with controlled access |
+| Honeypot telemetry | Cowrie JSON log captured and summarized |
+| RAG | CLI Phase 2 completed and validated |
+| Automatic updates | Implemented but disabled by default |
+
+The public Internet honeypot sensor is not enabled by default. Captured
+Tailscale and local events prove the sensor works, but they are not evidence of
+public Internet attacks. Real public capture would require an explicit router
+port-forwarding decision.
+
+## Quick start
+
+### Requirements
+
+- Orange Pi Zero 3 or compatible ARM64 Debian 13 system.
+- Minimum 450 MB available memory and 2 GB free disk space for the bootstrap.
+- Root access for initial service installation.
+- Debian/DietPi compatibility.
+- Optional Tailscale for remote administration.
+- Optional Ollama for local AI reports.
+
+### One-command bootstrap
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jqime/edge-sec-agent/main/install.sh \
+  | sudo bash -s stable
 ```
 
-### Port Matrix
+The bootstrap clones the selected channel, creates the `edgesec` service user,
+prepares persistent directories, creates the application virtual environment,
+installs systemd units and activates the core services.
 
-| Port | Service | Interface | Security Control |
-|---|---|---|---|
-| 22 | Legacy SSH | none | `iptables DROP` (IPv4 + IPv6) |
-| 2222 | Dropbear SSH | `tailscale0` only | tailnet-restricted access |
-| 8443 | Nginx (HTTPS) | public | TLS 1.2/1.3, Basic Auth, 5 r/s rate limit, security headers |
-| 5000 | Gunicorn / Flask API | `127.0.0.1` | loopback only, `DROP` externally |
-| 11434 | Ollama (local LLM) | `127.0.0.1` | loopback only, `DROP` externally |
-| 2223 | Cowrie Honeypot | `tailscale0` only | isolated sensor, `DROP` elsewhere |
-| 41641 | Tailscale (WireGuard) | UDP | tailnet VPN |
-
-The complete topology diagram is available at [docs/architecture.txt](docs/architecture.txt).
-
-## Core Capabilities
-
-### Perimeter Hardening
-
-- **Nginx**: TLS 1.2/1.3 termination, HTTP Basic Auth, rate limiting (5 requests/second, burst 10) and hardening headers (HSTS, `X-Frame-Options DENY`, `X-Content-Type-Options nosniff`, `Referrer-Policy`).
-- **Fail2Ban**: custom jails for `sshd` and `nginx-http-auth`.
-- **Firewall**: idempotent persistence via `edge-firewall.service`, applied over both IPv4 and IPv6.
-- **SSH**: port 22 is dropped at the kernel level; administration is restricted to Dropbear on the `tailscale0` interface.
-- **Honeypot**: an isolated Cowrie SSH sensor on `:2223` (dedicated user and directory) records attacker credentials and commands and dispatches alerts to Telegram. See [docs/HONEYPOT.md](docs/HONEYPOT.md).
-
-### Edge AI and Observability
-
-- **Local LLM**: Ollama integration (`tinyllama:1.1b`) for automated security reporting and latency/health probing.
-- **REST API**: OpenAI-shaped endpoints (`/v1/models`, `/v1/chat/completions`) returning live security reports and metrics. The completions endpoint returns a security report and is not a free-form chat interface.
-- **Telemetry**: Prometheus `/metrics` endpoint, a live security score at `/api/metrics`, and SQLite (WAL) historical retention with a 30-day policy.
-- **Honeypot RAG (Phase 2)**: natural-language queries over Cowrie logs via Ollama embeddings (`nomic-embed-text`) + `sqlite-vec`, executed from an isolated venv (`scripts/rag_query.py`). No PyTorch, no production impact. See `docs/RAG.md`.
-
-### DevSecOps Automation
-
-- **Systemd Timers**: `edge-sec-agent-health.timer` (watchdog) and `edge-sec-agent-backup.timer` (backups verified with SQLite `integrity_check` and a SHA256 manifest).
-- **Safe Updates**: opt-in update mechanism (`edge-sec-agent-update.timer`, disabled by default) with lock handling, health check and automatic rollback.
-- **CI Matrix**: cross-architecture validation (x86_64 + native ARM64) executing real integration tests on the production architecture.
-
-## Quickstart
-
-Requirements: ARM64 hardware, Debian 13 (trixie) or DietPi, and root access for provisioning.
+### Manual bootstrap
 
 ```bash
 git clone https://github.com/jqime/edge-sec-agent.git
@@ -100,44 +179,160 @@ cd edge-sec-agent
 sudo ./scripts/bootstrap_debian_arm64.sh --channel stable
 ```
 
-Verification:
+Use `--dry-run` to validate architecture, OS, memory and repository availability
+before applying changes:
+
+```bash
+sudo ./scripts/bootstrap_debian_arm64.sh --channel stable --dry-run
+```
+
+### Verify the installation
 
 ```bash
 curl -s http://127.0.0.1:5000/v1/global/health
+curl -s http://127.0.0.1:5000/api/metrics
+curl -s http://127.0.0.1:5000/metrics
+
+systemctl status edge-sec-agent edge-firewall
+systemctl list-timers --all | grep edge
 journalctl -u edge-sec-agent -f
 ```
 
-## Documentation & Governance
+The public API is also served through Nginx on port `8443` and requires Basic
+Authentication.
+
+## API surface
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/v1/global/health` | `GET` | Dependencies, temperature, RAM, uptime and health state |
+| `/api/metrics` | `GET` | Live security score and infrastructure metrics |
+| `/metrics` | `GET` | Prometheus text exposition |
+| `/v1/models` | `GET` | OpenAI-shaped model discovery |
+| `/v1/chat/completions` | `POST` | Security report compatible with OpenAI clients |
+| `/ask` | `POST` | Legacy security report endpoint |
+| `/api/honeypot/summary` | `GET` | Aggregate Cowrie counts and source IPs |
+
+The honeypot summary intentionally excludes usernames, passwords and command
+payloads. The OpenAPI contract is maintained in
+[`docs/api_spec.yaml`](docs/api_spec.yaml).
+
+## Operations
+
+Canonical installation layout:
+
+```text
+/opt/edge-sec-agent/
+├── app/current/       Versioned repository and scripts
+├── app/venv/          Application Python environment
+├── config/            Non-secret runtime environment
+├── data/              SQLite database and update metadata
+├── reports/           Generated security reports
+├── backups/           Verified backups
+├── logs/              Service-owned runtime logs
+└── secrets.env        Local secrets, excluded from Git
+```
+
+Use the operations and recovery runbooks for deployment, restore and incident
+procedures:
+
+- [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
+- [`docs/RECOVERY_RUNBOOK.md`](docs/RECOVERY_RUNBOOK.md)
+- [`docs/HONEYPOT.md`](docs/HONEYPOT.md)
+- [`docs/RAG.md`](docs/RAG.md)
+
+### Backup
+
+```bash
+sudo /opt/edge-sec-agent/app/current/scripts/backup_state.sh
+```
+
+### Restore
+
+```bash
+sudo /opt/edge-sec-agent/app/current/scripts/restore_state.sh \
+  /opt/edge-sec-agent/backups/<timestamp>
+```
+
+Backups include SQLite data, reports, a manifest and SHA-256 checksums. SQLite
+copies are checked with `PRAGMA integrity_check` before they are considered
+valid.
+
+### Opt-in safe updates
+
+```bash
+sudo mkdir -p /etc/edge-sec-agent
+sudo touch /etc/edge-sec-agent/update.enabled
+sudo systemctl enable --now edge-sec-agent-update.timer
+```
+
+The updater rejects dirty local repositories, locks concurrent executions,
+backs up before changing the checkout, runs validation, restarts only the agent,
+checks health and restores the previous commit when the service fails.
+
+## Development and testing
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+
+.venv/bin/pytest tests/ -q
+.venv/bin/pytest tests/ -m integration -q
+.venv/bin/ruff check src/ tests/
+.venv/bin/mypy src/ --ignore-missing-imports
+python3 -m compileall src/
+bash -n scripts/*.sh install.sh
+```
+
+The CI pipeline validates Python, shell syntax and systemd units on both
+`ubuntu-latest` and a native ARM64 runner. An integration test executes the real
+agent binary with isolated database and report paths.
+
+## Security model and limitations
+
+- Secrets must remain outside Git, with restrictive ownership and permissions.
+- Nginx authentication protects the HTTP administration plane.
+- Gunicorn and Ollama are only reachable through loopback.
+- Tailscale restricts administrative and honeypot ingress.
+- systemd uses a non-login service user, `ProtectHome=true`,
+  `ProtectSystem=strict` and restricted writable paths where applicable.
+- A firewall unit does not flush unrelated Tailscale or Docker chains.
+- CI validates architecture compatibility but cannot replace host-specific
+  thermal, network and hardware testing.
+- The RAG CLI is intentionally isolated from the production virtual environment.
+- Current RAG responses are suitable for delayed, factual log consultation, not
+  real-time incident analysis.
+- The repository history has been purged of legacy secrets, but GitHub objects
+  retained by the platform or external clones are outside repository control.
+- One non-secret bloat artifact remains in Git history pending an explicit,
+  owner-approved `filter-repo` operation.
+
+## Roadmap
+
+The prioritized backlog is documented in [`docs/ROADMAP.md`](docs/ROADMAP.md).
+The next safe improvements are:
+
+1. Merge and validate the reproducible bootstrap change in CI.
+2. Add pre-commit secret and static-analysis enforcement.
+3. Add contract tests for `docs/api_spec.yaml`.
+4. Expand integration coverage beyond the chat report path.
+5. Add Telegram threshold alerts for temperature, RAM and security score.
+6. Add an optional Grafana/Prometheus node for dashboards.
+7. Integrate the isolated Cowrie RAG as an opt-in API feature only after
+   capacity and performance validation.
+
+## Project documentation
 
 | Document | Description |
 |---|---|
-| [Operations Runbook](docs/OPERATIONS.md) | Deployment, systemd, and firewall management. |
-| [Recovery Runbook](docs/RECOVERY_RUNBOOK.md) | Disaster recovery procedures. |
-| [API Specification](docs/api_spec.yaml) | OpenAPI 3.0.3 contract. |
-| [Architecture](docs/architecture.txt) | Network and infrastructure topology. |
-
-## Testing & CI
-
-The suite contains 49 unit tests and 1 integration test, with a measured coverage of 55%. The integration test executes the real agent binary against an isolated temporary database and report directory.
-
-The CI pipeline runs on a matrix of `ubuntu-latest` (x86_64) and `ubuntu-24.04-arm` (native ARM64). Each job executes `ruff`, `mypy`, `pytest`, `compileall`, Bash syntax validation, and `systemd-analyze verify`; the integration test runs only on the ARM64 runner.
-
-```bash
-pytest tests/ -q                 # unit suite
-pytest tests/ -m integration -q  # integration test
-```
-
-## Security & Limitations
-
-- The repository history has been purged of legacy secrets. Active secrets must be managed outside version control at `/opt/edge-sec-agent/secrets.env` (mode `600`, owner `edgesec:edgesec`).
-- CI validates x86_64 and ARM64 runners; the physical hardware target is an Orange Pi Zero 3, validated manually.
-- A non-secret bloat artifact (`picoclaw_aarch64.deb`, approximately 20 MB) remains in the Git history pending a future purge.
-- The Python packaging version in `pyproject.toml` is `1.0.0`, whereas the release tag is `v1.1.0`.
-
-A prioritized list of pending improvements is maintained in [docs/ROADMAP.md](docs/ROADMAP.md).
+| [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | Deployment, services and firewall operation |
+| [`docs/RECOVERY_RUNBOOK.md`](docs/RECOVERY_RUNBOOK.md) | Backup and recovery procedures |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Design decisions and request flow |
+| [`docs/HONEYPOT.md`](docs/HONEYPOT.md) | Cowrie installation, evidence and limitations |
+| [`docs/RAG.md`](docs/RAG.md) | Isolated Cowrie RAG architecture and usage |
+| [`docs/api_spec.yaml`](docs/api_spec.yaml) | OpenAPI 3.0.3 REST contract |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Prioritized improvements |
 
 ## License
 
-Distributed under the MIT License. See [LICENSE](LICENSE).
-
-Copyright (c) 2026 Edge Security Agent Contributors.
+Distributed under the MIT License. See [`LICENSE`](LICENSE).
