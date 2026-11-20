@@ -19,7 +19,9 @@ def test_new_scripts_have_valid_bash_syntax():
         root / "install.sh",
     ]
     for script in scripts:
-        result = subprocess.run(["bash", "-n", str(script)], capture_output=True, text=True, check=False)
+        result = subprocess.run(
+            ["bash", "-n", str(script)], capture_output=True, text=True, check=False
+        )
         assert result.returncode == 0, f"{script}: {result.stderr}"
 
 
@@ -45,7 +47,9 @@ def test_backup_and_restore_roundtrip(tmp_path: Path):
     env["EDGE_INSTALL_ROOT"] = str(install_root)
 
     backup_script = _repo_root() / "scripts/backup_state.sh"
-    backup_result = subprocess.run([str(backup_script)], env=env, capture_output=True, text=True, check=False)
+    backup_result = subprocess.run(
+        [str(backup_script)], env=env, capture_output=True, text=True, check=False
+    )
     assert backup_result.returncode == 0, backup_result.stderr
     backup_path = Path(backup_result.stdout.strip())
     assert (backup_path / "SHA256SUMS").exists()
@@ -55,7 +59,11 @@ def test_backup_and_restore_roundtrip(tmp_path: Path):
 
     restore_script = _repo_root() / "scripts/restore_state.sh"
     restore_result = subprocess.run(
-        [str(restore_script), str(backup_path)], env=env, capture_output=True, text=True, check=False
+        [str(restore_script), str(backup_path)],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     assert restore_result.returncode == 0, restore_result.stderr
 
@@ -68,7 +76,9 @@ def test_backup_and_restore_roundtrip(tmp_path: Path):
 
 def test_update_script_blocks_main_without_explicit_override():
     script = _repo_root() / "scripts/update_safe.sh"
-    result = subprocess.run([str(script), "--channel", "main", "--dry-run"], capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        [str(script), "--channel", "main", "--dry-run"], capture_output=True, text=True, check=False
+    )
     assert result.returncode != 0
     assert "bloqueada por seguridad" in result.stderr
 
@@ -82,9 +92,7 @@ def test_health_watchdog_restart_path_is_safe_with_mock_restart(tmp_path: Path):
 
     mock_systemctl = bin_dir / "systemctl"
     mock_systemctl.write_text(
-        "#!/usr/bin/env bash\n"
-        'printf "%s\\n" "$*" > "$MOCK_SYSTEMCTL_LOG"\n'
-        "exit 0\n",
+        '#!/usr/bin/env bash\nprintf "%s\\n" "$*" > "$MOCK_SYSTEMCTL_LOG"\nexit 0\n',
         encoding="utf-8",
     )
     mock_systemctl.chmod(0o755)

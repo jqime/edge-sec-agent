@@ -2,6 +2,7 @@
 """
 wsgi.py — Punto de entrada WSGI para producción (Gunicorn/uWSGI).
 """
+
 import logging
 
 logging.basicConfig(

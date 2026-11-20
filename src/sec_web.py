@@ -1,4 +1,3 @@
-
 """
 sec_web.py — Servidor web Flask para Edge Sec Agent.
 Endpoints:
@@ -10,6 +9,7 @@ Endpoints:
   /ask                → legacy chat
   /                   → dashboard mínimo
 """
+
 import json
 import logging
 import os
@@ -106,7 +106,12 @@ def _get_fail2ban_banned_ips() -> int:
         match = re.search(r"Total banned:\s*(\d+)", result.stdout)
         if match:
             return int(match.group(1))
-    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError) as exc:
+    except (
+        FileNotFoundError,
+        subprocess.TimeoutExpired,
+        subprocess.CalledProcessError,
+        OSError,
+    ) as exc:
         logger.debug("fail2ban-client no disponible: %s", exc)
     return 0
 
@@ -190,7 +195,9 @@ def _check_sqlite() -> dict[str, Any]:
 
 def _last_update_info() -> dict[str, Any]:
     def _loader() -> dict[str, Any]:
-        update_file = os.environ.get("EDGE_LAST_UPDATE_FILE", "/opt/edge-sec-agent/data/last_update.json")
+        update_file = os.environ.get(
+            "EDGE_LAST_UPDATE_FILE", "/opt/edge-sec-agent/data/last_update.json"
+        )
         if not os.path.exists(update_file):
             return {"updated_at": None, "commit": None, "channel": None}
         try:
@@ -224,6 +231,7 @@ def _get_live_security_score() -> int | None:
 
 def _honeypot_summary() -> dict[str, Any]:
     """Lee eventos Cowrie agregados sin exponer credenciales ni texto de comandos."""
+
     def _loader() -> dict[str, Any]:
         log_path = os.environ.get(
             "COWRIE_LOG",
@@ -269,14 +277,16 @@ def _honeypot_summary() -> dict[str, Any]:
             logger.debug("No se pudo leer el resumen Cowrie: %s", exc)
             return summary
 
-        summary.update({
-            "available": True,
-            "events": events,
-            "failed_logins": counts["cowrie.login.failed"],
-            "successful_logins": counts["cowrie.login.success"],
-            "command_events": counts["cowrie.command.input"],
-            "unique_source_ips": sorted(source_ips),
-        })
+        summary.update(
+            {
+                "available": True,
+                "events": events,
+                "failed_logins": counts["cowrie.login.failed"],
+                "successful_logins": counts["cowrie.login.success"],
+                "command_events": counts["cowrie.command.input"],
+                "unique_source_ips": sorted(source_ips),
+            }
+        )
         return summary
 
     return _cached("honeypot_summary", 30, _loader)
@@ -369,7 +379,9 @@ def prometheus_metrics() -> Response:
     updated_epoch = 0
     if updated_at:
         try:
-            updated_epoch = int(datetime.fromisoformat(updated_at.replace("Z", "+00:00")).timestamp())
+            updated_epoch = int(
+                datetime.fromisoformat(updated_at.replace("Z", "+00:00")).timestamp()
+            )
         except ValueError:
             updated_epoch = 0
     commit = os.environ.get("EDGE_GIT_COMMIT", update.get("commit") or "unknown")
@@ -424,13 +436,15 @@ def api_metrics() -> tuple[Response, int]:
         temp = _get_temperature_c()
         ram = _get_ram_usage_percent()
         score = _compute_score(ssh, ports, temp, ram)
-        return jsonify({
-            "score": score,
-            "ssh_failures": ssh,
-            "open_ports": ports,
-            "temp_c": temp,
-            "ram_percent": ram,
-        }), 200
+        return jsonify(
+            {
+                "score": score,
+                "ssh_failures": ssh,
+                "open_ports": ports,
+                "temp_c": temp,
+                "ram_percent": ram,
+            }
+        ), 200
     except Exception:
         logger.exception("Error en /api/metrics")
         return jsonify({"error": "internal_error"}), 500
@@ -439,10 +453,12 @@ def api_metrics() -> tuple[Response, int]:
 @app.route("/v1/models")
 def list_models() -> tuple[Response, int]:
     """Endpoint compatible OpenAI para listar modelos disponibles."""
-    return jsonify({
-        "object": "list",
-        "data": [{"id": "sec-agent", "object": "model"}],
-    }), 200
+    return jsonify(
+        {
+            "object": "list",
+            "data": [{"id": "sec-agent", "object": "model"}],
+        }
+    ), 200
 
 
 @app.route("/api/honeypot/summary")
@@ -472,12 +488,19 @@ def chat_completions() -> tuple[Response, int]:
             check=True,
         )
         respuesta = result.stdout.strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError) as e:
+    except (
+        FileNotFoundError,
+        subprocess.TimeoutExpired,
+        subprocess.CalledProcessError,
+        OSError,
+    ) as e:
         logger.error("Error executing sec-agent: %s", str(e))
         respuesta = "Error ejecutando sec-agent"
-    return jsonify({
-        "choices": [{"message": {"role": "assistant", "content": respuesta}}],
-    }), 200
+    return jsonify(
+        {
+            "choices": [{"message": {"role": "assistant", "content": respuesta}}],
+        }
+    ), 200
 
 
 @app.route("/ask", methods=["POST"])
@@ -499,7 +522,12 @@ def ask() -> tuple[Response, int]:
             check=True,
         )
         respuesta = result.stdout.strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError) as e:
+    except (
+        FileNotFoundError,
+        subprocess.TimeoutExpired,
+        subprocess.CalledProcessError,
+        OSError,
+    ) as e:
         logger.error("Error executing sec-agent: %s", str(e))
         respuesta = "Error ejecutando sec-agent"
     return jsonify({"respuesta": respuesta}), 200

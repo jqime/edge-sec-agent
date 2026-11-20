@@ -5,6 +5,7 @@ Obtiene métricas del sistema (SSH, puertos, temperatura, RAM),
 calcula un score de seguridad y persiste en base de datos SQLite unificada.
 Uso CLI: sec-agent --security [--json] [--html]
 """
+
 import json
 import logging
 import os
@@ -198,9 +199,7 @@ def _get_ram_usage_percent() -> float | None:
 #   Puertos de riesgo: 8 pts cada uno, tope 40  — puertos no esenciales abiertos
 #   Temperatura >55°C: 1.5 pts por grado extra, tope 25  — sobrecalentamiento = throttling
 #   RAM >60%: 0.8 pts por punto extra, tope 25  — presión de memoria = riesgo de OOM
-def _compute_score(
-    ssh: int, ports: list[str], temp: float | None, ram: float | None
-) -> int:
+def _compute_score(ssh: int, ports: list[str], temp: float | None, ram: float | None) -> int:
     penalties = float(min(ssh * 2, 60))
     allowed = {22, 80, 443, 25, 53}
     risk_ports = sum(1 for p in ports if int(p) not in allowed)
@@ -221,7 +220,9 @@ def _format_report(
     ]
     lines.append(f"- SSH fallos: {ssh}")
     lines.append(f"- Puertos abiertos: {', '.join(ports) if ports else 'ninguno'}")
-    lines.append(f"- Temperatura CPU: {temp:.1f}C" if temp is not None else "- Temperatura: desconocida")
+    lines.append(
+        f"- Temperatura CPU: {temp:.1f}C" if temp is not None else "- Temperatura: desconocida"
+    )
     lines.append(f"- RAM usado: {ram:.1f}%" if ram is not None else "- RAM: desconocido")
     lines.append("\nRecomendaciones:")
     if ssh > 0:
@@ -285,7 +286,9 @@ def _generate_html_recommendations(
 ) -> list[str]:
     recs: list[str] = []
     if ssh > 0:
-        recs.append("SSH: usar autenticación por clave, deshabilitar root y login por contraseña, activar fail2ban.")
+        recs.append(
+            "SSH: usar autenticación por clave, deshabilitar root y login por contraseña, activar fail2ban."
+        )
     if ports:
         recs.append("Puertos abiertos: cerrar servicios no esenciales, usar firewall.")
     if temp is not None and temp > 55:
@@ -299,7 +302,9 @@ def _generate_html_recommendations(
 
 def save_html_report(html_text: str) -> str:
     os.makedirs(REPORTS_DIR, exist_ok=True)
-    path = os.path.join(REPORTS_DIR, f"security_{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.html")
+    path = os.path.join(
+        REPORTS_DIR, f"security_{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.html"
+    )
     with open(path, "w", encoding="utf-8") as f:
         f.write(html_text)
     logger.info("Informe HTML guardado: %s", path)
@@ -308,7 +313,9 @@ def save_html_report(html_text: str) -> str:
 
 def save_report(text: str) -> str:
     os.makedirs(REPORTS_DIR, exist_ok=True)
-    path = os.path.join(REPORTS_DIR, f"security_{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.txt")
+    path = os.path.join(
+        REPORTS_DIR, f"security_{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.txt"
+    )
     with open(path, "w") as f:
         f.write(text)
     logger.info("Informe TXT guardado: %s", path)
