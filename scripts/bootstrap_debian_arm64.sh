@@ -11,6 +11,9 @@ INSTALL_ROOT="${EDGE_INSTALL_ROOT:-$INSTALL_ROOT_DEFAULT}"
 SERVICE_USER="${EDGE_SERVICE_USER:-$SERVICE_USER_DEFAULT}"
 CHANNEL="${EDGE_UPDATE_CHANNEL:-$CHANNEL_DEFAULT}"
 DRY_RUN="${EDGE_BOOTSTRAP_DRY_RUN:-0}"
+git_safe() {
+  git -c "safe.directory=$APP_DIR" -C "$APP_DIR" "$@"
+}
 
 usage() {
   cat <<USAGE
@@ -134,18 +137,18 @@ mkdir -p "$DATA_DIR" "$REPORTS_DIR" "$BACKUPS_DIR" "$CONFIG_DIR" "$LOG_DIR" "$(d
 # Idempotencia: solo clona si no existe el directorio .git
 if [[ -d "$APP_DIR/.git" ]]; then
   echo "Directorio de instalación existente detectado. Verificando canal $CHANNEL..."
-  git -C "$APP_DIR" fetch --prune origin
-  if git -C "$APP_DIR" show-ref --verify --quiet "refs/remotes/origin/$CHANNEL"; then
-    git -C "$APP_DIR" checkout "$CHANNEL"
-    git -C "$APP_DIR" pull --ff-only origin "$CHANNEL"
+  git_safe fetch --prune origin
+  if git_safe show-ref --verify --quiet "refs/remotes/origin/$CHANNEL"; then
+    git_safe checkout "$CHANNEL"
+    git_safe pull --ff-only origin "$CHANNEL"
   else
     echo "Canal $CHANNEL no encontrado en remoto. Se mantiene rama actual." >&2
   fi
 else
   echo "Clonando repositorio a $APP_DIR..."
   git clone "$REPO_URL" "$APP_DIR"
-  if git -C "$APP_DIR" show-ref --verify --quiet "refs/remotes/origin/$CHANNEL"; then
-    git -C "$APP_DIR" checkout "$CHANNEL"
+  if git_safe show-ref --verify --quiet "refs/remotes/origin/$CHANNEL"; then
+    git_safe checkout "$CHANNEL"
   fi
 fi
 
@@ -237,7 +240,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   echo "  ✅ Memoria: ${MEM_KB} KB (mínimo 450000 KB)"
   echo "  ✅ Espacio en $INSTALL_ROOT: suficiente (> 2GB)"
   echo "  ✅ Repositorio: $REPO_URL accesible"
-  echo "  ✅ Canal: $CHANNEL $(git -C "$APP_DIR" show-ref --verify --quiet "refs/remotes/origin/$CHANNEL" && echo "disponible" || echo "no disponible")"
+  echo "  ✅ Canal: $CHANNEL $(git_safe show-ref --verify --quiet "refs/remotes/origin/$CHANNEL" && echo "disponible" || echo "no disponible")"
   echo "  ✅ Usuario servicio: $SERVICE_USER"
   echo "  ✅ Dependencias: git, python3, venv, pip instalables"
   echo "  ✅ Directorios: $DATA_DIR, $REPORTS_DIR, $BACKUPS_DIR, $CONFIG_DIR, $LOG_DIR creados"

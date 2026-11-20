@@ -9,6 +9,9 @@ CHANNEL="${EDGE_UPDATE_CHANNEL:-stable}"
 HEALTH_URL="${EDGE_HEALTH_URL:-http://127.0.0.1:5000/v1/global/health}"
 TIMEOUT_SEC="${EDGE_UPDATE_TIMEOUT_SEC:-900}"
 DRY_RUN=0
+git_safe() {
+  git -c "safe.directory=$APP_DIR" -C "$APP_DIR" "$@"
+}
 
 usage() {
   echo "Uso: $0 [--dry-run] [--channel stable]"
@@ -49,21 +52,21 @@ run_cmd() {
   fi
 }
 
-if [[ -n "$(git -C "$APP_DIR" status --porcelain)" ]]; then
+if [[ -n "$(git_safe status --porcelain)" ]]; then
   echo "Repositorio con cambios locales. Abortando actualización segura." >&2
   exit 1
 fi
 
-OLD_SHA="$(git -C "$APP_DIR" rev-parse HEAD)"
+OLD_SHA="$(git_safe rev-parse HEAD)"
 
-run_cmd git -C "$APP_DIR" fetch --prune origin
-if ! git -C "$APP_DIR" show-ref --verify --quiet "refs/remotes/origin/$CHANNEL"; then
+run_cmd git_safe fetch --prune origin
+if ! git_safe show-ref --verify --quiet "refs/remotes/origin/$CHANNEL"; then
   echo "Canal remoto origin/$CHANNEL no existe." >&2
   exit 1
 fi
 
-run_cmd git -C "$APP_DIR" checkout "$CHANNEL"
-run_cmd git -C "$APP_DIR" reset --hard "origin/$CHANNEL"
+run_cmd git_safe checkout "$CHANNEL"
+run_cmd git_safe reset --hard "origin/$CHANNEL"
 
 run_cmd "$APP_DIR/scripts/backup_state.sh"
 
@@ -72,7 +75,7 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
   VENV_DIR="$INSTALL_ROOT/app/venv"
   if [[ ! -x "$VENV_DIR/bin/ruff" || ! -x "$VENV_DIR/bin/mypy" || ! -x "$VENV_DIR/bin/pytest" ]]; then
     echo "Entorno de validación incompleto: $VENV_DIR" >&2
-    git -C "$APP_DIR" reset --hard "$OLD_SHA" >/dev/null 2>&1
+    git_safe reset --hard "$OLD_SHA" >/dev/null 2>&1
     exit 1
   fi
   timeout "$TIMEOUT_SEC" "$VENV_DIR/bin/ruff" check "$APP_DIR/src" "$APP_DIR/tests"
@@ -85,7 +88,7 @@ run_cmd systemctl restart "$SERVICE_NAME"
 if [[ "$DRY_RUN" -eq 0 ]]; then
   if ! curl --fail --silent --show-error --max-time 10 "$HEALTH_URL" >/dev/null; then
     echo "Health check post-update falló. Iniciando rollback a $OLD_SHA..." >&2
-    git -C "$APP_DIR" reset --hard "$OLD_SHA" >/dev/null 2>&1
+    git_safe reset --hard "$OLD_SHA" >/dev/null 2>&1
     run_cmd systemctl restart "$SERVICE_NAME" >/dev/null 2>&1
     sleep 2
     if curl --fail --silent --show-error --max-time 10 "$HEALTH_URL" >/dev/null; then
@@ -99,7 +102,7 @@ fi
 
 if [[ "$DRY_RUN" -eq 0 ]]; then
   mkdir -p "$INSTALL_ROOT/data"
-  printf '{"updated_at":"%s","channel":"%s","commit":"%s"}\n' "$(date -u +%FT%TZ)" "$CHANNEL" "$(git -C "$APP_DIR" rev-parse HEAD)" > "$INSTALL_ROOT/data/last_update.json"
+  printf '{"updated_at":"%s","channel":"%s","commit":"%s"}\n' "$(date -u +%FT%TZ)" "$CHANNEL" "$(git_safe rev-parse HEAD)" > "$INSTALL_ROOT/data/last_update.json"
 fi
 
 echo "Update seguro completado (canal=$CHANNEL, dry_run=$DRY_RUN)"
