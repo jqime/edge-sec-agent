@@ -1,6 +1,6 @@
 [project]
 name = "edge-sec-agent"
-version = "1.1.0"
+version = "1.2.0"
 description = "DevSecOps autonomous perimeter security ecosystem for edge computing devices"
 requires-python = ">=3.10"
 

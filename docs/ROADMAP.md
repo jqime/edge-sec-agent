@@ -1,6 +1,6 @@
 # Roadmap de Mejoras — Edge Security Agent
 
-**Estado base:** v1.1.0 — 10/10 lotes cerrados, purga histórica completa, CI verde (x86_64 + ARM64).
+**Estado base:** v1.2.0 — bootstrap reproducible desplegado en Orange Pi; 10 lotes de remediación cerrados; CI verde (x86_64 + ARM64).
 Las tareas son opcionales; las que implican reescritura de historia o cambios de firewall requieren **aprobación explícita del owner**.
 
 Prioridades: 🔴 Alta · 🟡 Media · 🟢 Baja
