@@ -209,6 +209,19 @@ def _last_update_info() -> dict[str, Any]:
     return _cached("last_update", 15, _loader)
 
 
+def _get_live_security_score() -> int | None:
+    """Calcula el score actual sin depender de una fila SQLite reciente."""
+    try:
+        ssh = _count_ssh_failures()
+        ports = _get_open_ports()
+        temp = _get_temperature_c()
+        ram = _get_ram_usage_percent()
+        return int(_compute_score(ssh, ports, temp, ram))
+    except (OSError, subprocess.SubprocessError, ValueError, TypeError) as exc:
+        logger.debug("No se pudo calcular el score vivo: %s", exc)
+        return None
+
+
 def _honeypot_summary() -> dict[str, Any]:
     """Lee eventos Cowrie agregados sin exponer credenciales ni texto de comandos."""
     def _loader() -> dict[str, Any]:
@@ -281,6 +294,8 @@ def health() -> tuple[Response, int]:
     uptime = _get_uptime_seconds()
     banned = _get_fail2ban_banned_ips()
     latest = get_latest()
+    live_score = _get_live_security_score()
+    security_score = live_score if live_score is not None else (latest or {}).get("score")
     ollama = _check_ollama()
     sqlite_status = _check_sqlite()
 
@@ -313,7 +328,7 @@ def health() -> tuple[Response, int]:
         "device": "Orange Pi Zero 3",
         "environment": "production",
         "uptime_seconds": uptime,
-        "security_score": (latest or {}).get("score"),
+        "security_score": security_score,
         "fail2ban_banned_ips": banned,
         "warnings": warnings,
         "hardware": {
@@ -336,8 +351,12 @@ def prometheus_metrics() -> Response:
     """Endpoint Prometheus con temperatura, RAM, score y banned IPs."""
     temp = _get_cpu_temp()
     ram = _get_ram_percent()
-    latest = get_latest()
-    score = (latest or {}).get("score", 0) or 0
+    live_score = _get_live_security_score()
+    if live_score is not None:
+        score = live_score
+    else:
+        latest = get_latest()
+        score = (latest or {}).get("score", 0) or 0
     banned = _get_fail2ban_banned_ips()
     ollama = _check_ollama()
     update = _last_update_info()

@@ -158,6 +158,15 @@ if [[ "$LEGACY_LAYOUT" -eq 1 ]]; then
   ln -sfn "$INSTALL_ROOT/venv" "$INSTALL_ROOT/app/venv"
 fi
 
+# Persistir metadata reproducible de instalación/update para health y metrics.
+if [[ "$DRY_RUN" -eq 0 ]]; then
+  mkdir -p "$DATA_DIR"
+  DEPLOYED_SHA="$(git_safe rev-parse HEAD)"
+  printf '{"updated_at":"%s","channel":"%s","commit":"%s"}\n' \
+    "$(date -u +%FT%TZ)" "$CHANNEL" "$DEPLOYED_SHA" > "$DATA_DIR/last_update.json"
+  chown "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR/last_update.json" 2>/dev/null || true
+fi
+
 python3 -m venv "$VENV_DIR"
 "$VENV_DIR/bin/pip" install --upgrade pip >/dev/null 2>&1
 "$VENV_DIR/bin/pip" install -r "$APP_DIR/requirements.txt" >/dev/null 2>&1
