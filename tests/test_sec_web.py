@@ -43,12 +43,22 @@ def _stable_dependencies():
 # ── /v1/global/health ────────────────────────────────────────────────────
 
 class TestHealth:
+    @patch("src.sec_web._get_live_security_score", return_value=85)
     @patch("src.sec_web._get_cpu_temp", return_value=45.0)
     @patch("src.sec_web._get_ram_percent", return_value=50.0)
     @patch("src.sec_web._get_uptime_seconds", return_value=3600.0)
     @patch("src.sec_web._get_fail2ban_banned_ips", return_value=3)
     @patch("src.sec_web.get_latest", return_value={"score": 85})
-    def test_healthy(self, mock_latest, mock_banned, mock_uptime, mock_ram, mock_temp, client):
+    def test_healthy(
+        self,
+        mock_latest,
+        mock_banned,
+        mock_uptime,
+        mock_ram,
+        mock_temp,
+        mock_live_score,
+        client,
+    ):
         resp = client.get("/v1/global/health")
         data = resp.get_json()
         assert resp.status_code == 200
@@ -108,11 +118,20 @@ class TestHealth:
 # ── /metrics ─────────────────────────────────────────────────────────────
 
 class TestMetrics:
+    @patch("src.sec_web._get_live_security_score", return_value=90)
     @patch("src.sec_web._get_cpu_temp", return_value=50.0)
     @patch("src.sec_web._get_ram_percent", return_value=40.0)
     @patch("src.sec_web._get_fail2ban_banned_ips", return_value=2)
     @patch("src.sec_web.get_latest", return_value={"score": 90})
-    def test_prometheus_format(self, mock_latest, mock_banned, mock_ram, mock_temp, client):
+    def test_prometheus_format(
+        self,
+        mock_latest,
+        mock_banned,
+        mock_ram,
+        mock_temp,
+        mock_live_score,
+        client,
+    ):
         resp = client.get("/metrics")
         assert resp.status_code == 200
         assert "text/plain" in resp.content_type
