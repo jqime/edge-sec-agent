@@ -1,0 +1,25 @@
+[Unit]
+Description=Cowrie SSH Honeypot
+After=network.target
+
+[Service]
+Type=simple
+User=cowrie
+Group=cowrie
+WorkingDirectory=/opt/cowrie/cowrie-git
+ExecStart=/opt/cowrie/venv/bin/twistd --nodaemon --pidfile= cowrie
+Restart=always
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=true
+ReadWritePaths=/opt/cowrie/cowrie-git/var
+
+[Install]
+WantedBy=multi-user.target

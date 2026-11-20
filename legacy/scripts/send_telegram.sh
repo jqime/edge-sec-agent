@@ -1,8 +1,13 @@
 ﻿#!/bin/bash
 set -euo pipefail
-SECRETS="/root/edge-sec-agent/secrets.env"
-ALERTS_CONFIG="/root/edge-sec-agent/alerts.json"
-[ -f "$SECRETS" ] && . "$SECRETS" >/dev/null 2>&1 || true
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+SECRETS="$PROJECT_ROOT/secrets.env"
+ALERTS_CONFIG="$PROJECT_ROOT/alerts.json"
+if [ -f "$SECRETS" ]; then
+    set +eu
+    . "$SECRETS" >/dev/null 2>&1 || true
+    set -eu
+fi
 TOKEN="${TELEGRAM_BOT_TOKEN:-TU_TOKEN}"
 CHAT_ID="${TELEGRAM_CHAT_ID:-TU_CHAT_ID}"
 MSG="$*"

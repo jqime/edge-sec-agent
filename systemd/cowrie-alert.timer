@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Cowrie honeypot alert dispatcher periodically
+
+[Timer]
+OnBootSec=90
+OnUnitActiveSec=60
+AccuracySec=5s
+Persistent=true
+Unit=cowrie-alert.service
+
+[Install]
+WantedBy=timers.target

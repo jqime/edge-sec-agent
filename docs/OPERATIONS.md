@@ -13,7 +13,7 @@ Este documento define una ruta reproducible para desplegar y operar `edge-sec-ag
 
 | Recurso | Ruta | Notas |
 |---|---|---|
-| Código | `/opt/edge-sec-agent` (actual) / `/opt/edge-sec-agent/app/current` (layout futuro) | Fuente de verdad del despliegue actual |
+| Código | `/opt/edge-sec-agent/app/current` | Fuente de verdad del despliegue |
 | Configuración | `/opt/edge-sec-agent/config/` | `edge-sec-agent.env`, `640 root:edgesec`, sin secretos |
 | Secretos | `/opt/edge-sec-agent/secrets.env` | `600 edgesec:edgesec`, fuera de Git |
 | Datos | `/opt/edge-sec-agent/data/` | SQLite (`history.db`), `ReadWritePaths` del unit |
@@ -44,14 +44,46 @@ sudo /opt/edge-sec-agent/app/current/scripts/bootstrap_debian_arm64.sh \
 
 El bootstrap valida arquitectura/memoria/espacio, crea `edgesec`, instala dependencias mínimas, prepara rutas persistentes, instala units de systemd y **no borra** datos existentes.
 
+En instalaciones anteriores con el checkout directamente en
+`/opt/edge-sec-agent`, el bootstrap crea enlaces de compatibilidad hacia
+`app/current` y `app/venv`. No mueve ni elimina el código, la configuración, los
+secretos ni los datos existentes.
+
 ## Servicios systemd
 
-Units recomendadas (en `systemd/`):
+Units del repositorio (`systemd/`) y estado esperado en el host:
 
-- `edge-sec-agent.service`: API Gunicorn (least privilege con `User=edgesec`)
-- `edge-sec-agent-health.timer`: watchdog periódico
-- `edge-sec-agent-backup.timer`: backup periódico
-- `edge-sec-agent-update.timer`: actualización segura **opt-in**
+| Unit | Instalado | Estado |
+|---|---|---|
+| `edge-sec-agent.service` | Sí | enabled/active (API Gunicorn, `User=edgesec`) |
+| `edge-firewall.service` | Sí | enabled/active (oneshot, firewall idempotente) |
+| `edge-sec-agent-health.timer` + `.service` | Sí | enabled/active (watchdog cada 2 min) |
+| `edge-sec-agent-backup.timer` + `.service` | Sí | enabled/active (backup horario) |
+| `edge-sec-agent-update.timer` + `.service` | **No** | **opt-in OFF** (ver sección) |
+
+Los `ExecStart` y `WorkingDirectory` usan el layout canónico
+`/opt/edge-sec-agent/app/current` y el entorno
+`/opt/edge-sec-agent/app/venv`. El bootstrap instala las units desde el
+checkout versionado para evitar rutas antiguas o dependencias de `/root`.
+
+> El unit `edge-sec-agent-staging.service` (`:5001`) fue **retirado**: era un
+> checkout duplicado no versionado. Backup en
+> `/var/backups/edge-sec-agent/staging-<timestamp>`.
+
+Verificar timers:
+
+```bash
+systemctl list-timers --all | grep edge
+systemctl status edge-sec-agent-health.timer edge-sec-agent-backup.timer --no-pager
+journalctl -u edge-sec-agent-health.service -n 5 --no-pager
+```
+
+Ejecutar manualmente / deshabilitar:
+
+```bash
+sudo systemctl start edge-sec-agent-backup.service     # backup puntual
+sudo systemctl disable --now edge-sec-agent-health.timer edge-sec-agent-backup.timer
+```
 
 Validación recomendada:
 
@@ -123,9 +155,9 @@ Reglas (IPv4 e IPv6 en espejo):
 Aplicar / simular / revertir:
 
 ```bash
-sudo /opt/edge-sec-agent/scripts/apply_firewall.sh           # aplica (idempotente)
-sudo /opt/edge-sec-agent/scripts/apply_firewall.sh --dry-run # simula sin cambiar
-sudo /opt/edge-sec-agent/scripts/apply_firewall.sh --remove  # rollback
+sudo /opt/edge-sec-agent/app/current/scripts/apply_firewall.sh           # aplica (idempotente)
+sudo /opt/edge-sec-agent/app/current/scripts/apply_firewall.sh --dry-run # simula sin cambiar
+sudo /opt/edge-sec-agent/app/current/scripts/apply_firewall.sh --remove  # rollback
 ```
 
 Instalar y activar la persistencia:
@@ -166,3 +198,25 @@ Tareas sin root (`edgesec`):
 - lectura/escritura de datos y reportes en rutas permitidas
 
 No se incluyen secretos en Git. Use `/opt/edge-sec-agent/config/edge-sec-agent.env` y almacénelos fuera del repositorio.
+
+## CI cross-arch (x86_64 + ARM64)
+
+El workflow `ci.yml` ejecuta la matriz `os: [ubuntu-latest, ubuntu-24.04-arm]`:
+
+- `ubuntu-latest` (x86_64): validaciones estándar (ruff, mypy, pytest, compileall, `bash -n`, `systemd-analyze verify`).
+- `ubuntu-24.04-arm` (ARM64 nativo): las mismas validaciones **más** los tests de integración reales.
+
+El test `@pytest.mark.integration` (`test_chat_integration_runs_real_agent`) se ejecuta **solo en ARM64**, que es la arquitectura de producción. Localmente se salta por defecto vía `addopts = "-m 'not integration'"` (pyproject.toml); se ejecuta con `pytest -m integration` (el `-m` de la CLI anula el `addopts`).
+
+Notas:
+
+- El test de integración es hardware-agnostic: aísla BD y reportes con `tmp_path`/`monkeypatch` y degrada con gracia si falta `/sys/class/thermal`.
+- Los runners ARM64 nativos de GitHub están disponibles para repositorios públicos. Si el label `ubuntu-24.04-arm` no estuviera disponible, el fallback es QEMU:
+
+```yaml
+- uses: docker/setup-qemu-action@v3
+- uses: actions/setup-python@v5
+  with:
+    python-version: '3.11'
+    architecture: 'arm64'
+```

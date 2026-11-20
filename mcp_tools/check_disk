@@ -1,8 +1,13 @@
 #!/bin/bash
 set -euo pipefail
-ROOT_DIR="/root/edge-sec-agent"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 SECRETS="$ROOT_DIR/secrets.env"
-[ -f "$SECRETS" ] && source "$SECRETS" 2>/dev/null || true
+TELEGRAM_NOTIFY="$ROOT_DIR/legacy/scripts/telegram-notify.sh"
+if [ -f "$SECRETS" ]; then
+  set +eu
+  source "$SECRETS" 2>/dev/null || true
+  set -eu
+fi
 parse_percent() { echo "$1" | tr -d '%' | tr -d ' '; }
 ROOT_USAGE=$(df -P / | awk 'NR==2 {print $5}' 2>/dev/null || echo "")
 HOME_USAGE=0
@@ -12,6 +17,6 @@ HOME_USAGE_N=$(parse_percent "$HOME_USAGE")
 echo "Root /: ${ROOT_USAGE_N:-0}%, /home: ${HOME_USAGE_N:-0}%"
 if [ "${ROOT_USAGE_N:-0}" -ge 80 ] || [ "${HOME_USAGE_N:-0}" -ge 80 ]; then
     MSG="ALERTA: Alto uso de disco. Raíz /: ${ROOT_USAGE_N:-0}%, /home: ${HOME_USAGE_N:-0}%."
-    command -v /usr/local/bin/telegram-notify.sh >/dev/null && /usr/local/bin/telegram-notify.sh "$MSG" 2>/dev/null || echo "[WARN] Telegram no disponible" >&2
+    [ -x "$TELEGRAM_NOTIFY" ] && "$TELEGRAM_NOTIFY" "$MSG" 2>/dev/null || echo "[WARN] Telegram no disponible" >&2
 fi
 exit 0

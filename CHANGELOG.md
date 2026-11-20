@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-10-17
+
+### Security
+- Rotados token de Telegram y password de Basic Auth (expuestos en el histórico).
+- Eliminado el literal `REDACTED` de `tests/live_demo_trigger.ps1`.
+- Firewall persistente IPv4 + IPv6 (unit `edge-firewall` idempotente).
+- `SECRETS_PATH` y `REPORTS_DIR` derivados de `__file__` (systemd-safe).
+
+### Fixed
+- `/v1/chat/completions` y `/ask`: usan la variable real `_SECURE_AGENT_SCRIPT` en lugar del literal. Test cómplice reescrito.
+- `source secrets.env` ya no aborta bajo `set -euo pipefail` (hash `$apr1$`).
+- `sec-chat`: path corregido a `mcp_tools/` real.
+- `check_cpu`: lógica de alerta corregida.
+
+### Changed
+- `stable` fast-forward a `main`. Tag `v1.1.0`.
+- Timers `edge-sec-agent-health` y `edge-sec-agent-backup` activos; `update.timer` OFF (opt-in).
+- Staging retirado.
+- Legacy (14 ficheros) movido a `legacy/`.
+- README con sección "Estado actual (TL;DR honesto)".
+
+### Removed
+- `app/` (shim PR#4 roto).
+- Worktree `/root/edge-sec-agent-pr4`.
+- Cruft `.bak` en `/etc/systemd/system/`.
+
 ## [1.0.0] - 2026-05-17
 
 ### Added

@@ -1,11 +1,18 @@
 ﻿#!/bin/bash
 set -euo pipefail
-if command -v /usr/local/bin/send_telegram.sh >/dev/null 2>&1; then
-    /usr/local/bin/send_telegram.sh "$@" || true
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
+SEND_TELEGRAM="$SCRIPT_DIR/send_telegram.sh"
+if [ -x "$SEND_TELEGRAM" ]; then
+    "$SEND_TELEGRAM" "$@" || true
     exit 0
 fi
-SECRETS="/root/edge-sec-agent/secrets.env"
-[ -f "$SECRETS" ] && . "$SECRETS" >/dev/null 2>&1 || true
+SECRETS="$PROJECT_ROOT/secrets.env"
+if [ -f "$SECRETS" ]; then
+    set +eu
+    . "$SECRETS" >/dev/null 2>&1 || true
+    set -eu
+fi
 TOKEN="${TELEGRAM_BOT_TOKEN:-TU_TOKEN}"
 CHAT_ID="${TELEGRAM_CHAT_ID:-TU_CHAT_ID}"
 MSG="$*"

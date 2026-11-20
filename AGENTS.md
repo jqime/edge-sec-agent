@@ -2,14 +2,15 @@
 
 ## Estado actual
 
-- Última sesión: 2026-10-10
-- Rama: chore/reconcile-agent-prompts
-- Último commit: 15b3a2b
-- Estado del repositorio: commit y push completados (chore/reconcile-agent-prompts)
+- Última sesión: 2026-10-17 (Honeypot Cowrie)
+- Rama: main
+- Último commit: 7645be6 (README enterprise)
+- Estado del repositorio: sincronizado con origin/main; Honeypot (Cowrie) instalado SIN commitear
 - Estado de la Orange Pi: VERIFICADA EN HARDWARE
-- Estado CI: NO VERIFICADO EN ESTE ENTORNO
-- Tests: 38 passed, coverage 52%
-- Riesgos abiertos: 2 hallazgos de producción pendientes (firewall hardening, sec-agent comando chat) — documentados
+- Estado CI: VERDE (x86_64 + ARM64 nativo)
+- Tests: 49 passed (+1 deselected), coverage 55%
+- Honeypot: `cowrie.service` active/enabled en `:2223`; alertas Telegram `scripts/cowrie_alert.sh`; timer `cowrie-alert.timer` (60s); unit endurecida
+- Riesgos abiertos: endpoint `/api/honeypot` opcional; exposición systemd de cowrie (7.9) mejorable
 
 ---
 
@@ -1062,3 +1063,122 @@ Retomar el proyecto `edge-sec-agent` tras PR #4 fusionado, ejecutar los pendient
 #### Estado final
 
 VALIDACIÓN LOCAL COMPLETADA — todos los checks passing; Orange Pi no verificada en hardware.
+
+### Sesión 2026-10-17 — Remediación por lotes (LOTEs 1-7)
+
+#### Objetivo
+
+Ejecutar la remediación priorizada por lotes tras la auditoría de producción: secretos, chat, firewall, rutas systemd-safe, release `v1.1.0`, timers y limpieza de legacy.
+
+#### Cerrados
+
+- **LOTE 1**: rotación de token Telegram + password Basic Auth; eliminación de literal `REDACTED` de `tests/live_demo_trigger.ps1`; `.gitignore` endurecido.
+- **LOTE 2**: fix `/v1/chat/completions` y `/ask` (usan `_SECURE_AGENT_SCRIPT` real en lugar del literal); `SECRETS_PATH` systemd-safe; tests cómplices reescritos.
+- **LOTE 3**: firewall persistente IPv4 + IPv6 (unit `edge-firewall` idempotente); CI sustituye path antes de `systemd-analyze verify`.
+- **LOTE 4**: `SECRETS_PATH` derivado de `__file__`; jerarquía de rutas documentada en `docs/OPERATIONS.md`.
+- **LOTE 5**: `stable` fast-forward a `main`; tag `v1.1.0`; PR #4 **pendiente de cierre manual** (contenido ya en `main`; head `8a77256` es ancestro).
+- **LOTE 6**: timers `edge-sec-agent-health.timer` y `edge-sec-agent-backup.timer` activos; `update.timer` opt-in (OFF); staging retirado; units alineados con runtime.
+- **LOTE 7**: `legacy/` (14 ficheros movidos con `git mv`); 7 `mcp_tools` reescritos a rutas derivadas (`pwd -P`); 3 bugs preexistentes corregidos (`source secrets.env` abortaba por `$apr1$`, `sec-chat` apuntaba a `scripts/mcp_tools/`, `check_cpu` nunca alertaba).
+
+#### Riesgos resueltos
+
+- R1 (token Telegram en histórico): rotado (purga del histórico pendiente).
+- R2 (password Basic Auth): rotada.
+- R3 (chat roto): arreglado y verificado en producción.
+- R4 (iptables no persistente): unit `edge-firewall`.
+- R5 (IPv6 sin reglas): espejo IPv4.
+- R6 (rutas `/root`): `SECRETS_PATH` derivado.
+- R7 (`secrets.env` 644): 600.
+- R9 (PR #4 obsoleto): contenido en `main`; cierre manual pendiente.
+- R12 (`stable` atrasado): fast-forward a `main`.
+- R13 (README desactualizado): actualizado en esta sesión (LOTE 8).
+
+#### Validación
+
+- pytest 49 passed (+1 deselected); ruff 0; mypy OK; compileall OK; `bash -n` 42/42.
+- CI GitHub Actions: `7adba5e` success, `8d936a1` success.
+- Producción `:5000` HEALTHY; `systemctl --failed` = 0.
+
+#### Pendiente
+
+- Purga histórica de secretos en Git (secretos presentes en el histórico).
+- CI ARM64 nativo.
+- Cruft de raíz (`AGENTS.md.bak.*`, `OPENCODE_EDGE_SEC_AGENT_MASTER_PROMPT.md`, `health_check.sh` duplicado, `__pycache__/`, `update.lock`) — fuera de scope.
+
+#### Estado final
+
+LOTEs 1-7 CERRADOS (CI verde). LOTE 8 (documentación) en curso.
+
+---
+
+### Sesión 2026-10-17 — Honeypot Cowrie (SSH)
+
+#### Objetivo
+Desplegar un Honeypot SSH (Cowrie) aislado y alertas Telegram, sentando base para un futuro RAG.
+
+#### Decisiones previas (consultadas al owner)
+- Memoria: continuar **sin swap/ZRAM** (Cowrie ligero, ~40MB).
+- Red: **firewall intacto**; `2223` sin regla (alcanzable en LAN/Tailscale).
+
+#### Cambios realizados
+- Usuario `cowrie` (uid 993, cuenta bloqueada) + `/opt/cowrie`.
+- Cowrie `0.1.dev1+gc7773f497` clonado en `/opt/cowrie/cowrie-git`; venv en `/opt/cowrie/venv`; `pip check` OK.
+- `etc/cowrie.cfg`: `[ssh] listen_endpoints = tcp:2223:interface=0.0.0.0`; `[output_jsonlog] enabled=true`; telnet off.
+- `etc/userdb.txt`: credenciales FALSAS (root/123456, admin/admin, ...) → captura de comandos.
+- `cowrie.service` (systemd, User=cowrie) creado, `enable --now`; `systemd-analyze verify` OK.
+- `scripts/cowrie_alert.sh` (nuevo, rutas derivadas, anti-spam por IP, flock, `COWRIE_ALERT_DEBUG`).
+- Backup previo: `/var/backups/edge-sec-agent/systemd-pre-cowrie-20261017-204841.tar.gz`.
+- Docs: `docs/HONEYPOT.md` (nuevo); este registro; README (Key Features).
+
+#### Evidencia
+- `systemctl is-active cowrie` → active; `ss -tlnp` → `0.0.0.0:2223` (twistd, 40.4M RAM).
+- Ataque simulado (`sshpass`, credenciales falsas) → `cowrie.login.failed`, `cowrie.login.success`, `cowrie.command.input`.
+- Anti-spam: 15 eventos → 1 alerta; eventos nuevos misma IP → suprimidos.
+- Telegram: respuesta API `{"ok":true,"message_id":1328}`.
+- `bash -n scripts/cowrie_alert.sh` → OK.
+
+#### Aislamiento
+Cowrie **no** toca `:2222` (Dropbear), `:5000` (API), nginx, Tailscale ni el firewall. Usuario y directorio dedicados.
+
+#### Cerrado tras revisión (misma sesión)
+- Timer `cowrie-alert.timer` (cada 60s) creado, enabled y verificado (oneshot `status=0/SUCCESS`).
+- Endurecimiento systemd de `cowrie.service`: `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict`, `ProtectHome`, `ReadWritePaths=/opt/cowrie/cowrie-git/var`; captura validada tras el cambio.
+- Bug corregido: `etc/userdb.txt` con em-dash rompía la auth de Cowrie (lee ASCII) → fichero purgado a ASCII.
+- Units versionadas en `systemd/cowrie.service`, `systemd/cowrie-alert.service`, `systemd/cowrie-alert.timer`.
+
+#### Pendiente (requiere autorización)
+- Endpoint `/api/honeypot` (opcional, toca `src/sec_web.py`) — descartado por ahora.
+- Reducir exposición systemd (RestrictAddressFamilies/SystemCallFilter), por etapas.
+
+#### Estado final
+Honeypot operativo, endurecido, con alertas automáticas. Commit selectivo + push (CI a validar).
+
+---
+
+### Sesión 2026-10-17 — RAG ligero sobre logs del Honeypot (Fase 2)
+
+#### Objetivo
+Consultar en lenguaje natural los eventos de Cowrie con RAG, sin PyTorch y sin tocar producción.
+
+#### Decisión de diseño
+`ChromaDB + sentence-transformers` descartado: arrastra PyTorch y la Pi tiene 3.9 GB RAM / **0 swap** (riesgo de OOM). Adoptado **Ollama `nomic-embed-text`** (768 dims) + **SQLite `sqlite-vec`** + LLM **`qwen2.5:1.5b`**.
+
+#### Cambios realizados
+- Venv aislado `/opt/edge-sec-agent-rag/venv` (`requests`, `sqlite-vec 0.1.9`, `ollama`). No toca el venv de producción.
+- Modelos Ollama: `nomic-embed-text` (274 MB) y `qwen2.5:1.5b` (986 MB).
+- Script `scripts/rag_query.py` (nuevo): subcomandos `ingest` / `stats` / `ask`; digest determinista + búsqueda semántica opcional; rutas por env.
+- Docs: `docs/RAG.md` (nuevo); README (bullet en *Edge AI and Observability*); esta entrada.
+
+#### Evidencia
+- `sqlite-vec` carga OK (`vec_version v0.1.9`); embeddings de 768 dims.
+- `ingest`: 73 eventos → `cowrie_vec.db` (3.1 MB), ~2 min.
+- `ask` (`qwen2.5:1.5b`, `RAG_TOP_K=0`): respuesta correcta con las 3 IPs y los comandos reales; ~3 min.
+- RAM estable (pico ~3.4 GB usados, ~0.5 GB libres), sin OOM.
+- `tinyllama:1.1b` descartado (contó 3 logins en vez de 4).
+
+#### No se tocó
+`src/sec_web.py`, el venv de producción, el firewall, Cowrie ni systemd. Fase 3 (endpoint) **pendiente de OK del owner**.
+
+#### Estado final
+Fase 2 (CLI aislado) completada y validada. Integración en producción a la espera de autorización.
+

@@ -1,193 +1,338 @@
+<div align="center">
+
+# Edge Security Agent
+
+**Autonomous perimeter security and DevSecOps observability for ARM64 edge devices**
+
 [![CI](https://github.com/jqime/edge-sec-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/jqime/edge-sec-agent/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-38%20passed-brightgreen)
-![Python](https://img.shields.io/badge/python-3.11%2B-blue)
-![Platform](https://img.shields.io/badge/platform-ARM64-orange)
+![Release](https://img.shields.io/badge/release-v1.1.0-blue)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+![Platform](https://img.shields.io/badge/platform-ARM64%20%7C%20Debian%2013-lightgrey)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-# Edge Security Agent: Arquitectura Hardened para Entornos Embebidos (Orange Pi Zero 3)
+</div>
 
-## 1. Resumen Ejecutivo
+## What it is
 
-Este proyecto implementa un ecosistema perimetral autónomo de seguridad (DevSecOps) optimizado para dispositivos de computación en el borde (Edge Computing) bajo la plataforma de hardware Orange Pi Zero 3. La solución unifica mecanismos de mitigación en la capa de transporte y aplicación (Modelos OSI 4 y 7), protegiendo servicios locales mediante un proxy inverso endurecido, control de acceso basado en credenciales, tasa límite de peticiones (Rate Limiting) y bloqueo automatizado ante ataques de fuerza bruta en tiempo real, garantizando simultáneamente la preservación de los ciclos de vida de los medios de almacenamiento Flash (MicroSD).
+**Edge Security Agent** is a self-hosted security appliance for low-resource
+ARM64 nodes. It was built for an Orange Pi Zero 3 running Debian 13 and
+combines perimeter hardening, local AI, intrusion detection, honeypot telemetry,
+backup, health monitoring and safe updates on a single device.
 
-## 2. Matriz de Arquitectura de Red y Segmentación de Servicios
+It is designed to keep operational data and inference on the node: the
+administration plane does not require a cloud service and Ollama runs a local
+model for security reporting. External integrations are optional.
 
-La infraestructura del agente está diseñada bajo el principio de mínimos privilegios y reducción de superficie de ataque, aislando los servicios críticos en interfaces locales inactivas para el exterior:
+## Why it exists
 
-| Componente / Servicio | Interfaz de Red | Puerto | Directiva de Seguridad y Control de Acceso |
-| :--- | :--- | :---: | :--- |
-| **Firewall Perimetral** | `0.0.0.0` / `::/0` | 22 | Directiva `DROP` total y persistente a nivel de Kernel mediante `iptables`. |
-| **Servicio SSH (Dropbear)** | `0.0.0.0` | 2222 | Puerto alternativo de administración, supeditado a análisis de heurística por Fail2Ban. |
-| **Proxy Inverso (Nginx)** | `0.0.0.0` | 8443 | Terminación TLS (1.2/1.3), inyección de cabeceras de seguridad y autenticación básica HTTP. |
-| **Core de la API (Gunicorn)** | `127.0.0.1` | 5000 | Aislamiento estricto en interfaz de Loopback. Inaccesible a peticiones externas directas. |
+A conventional microservice or cloud security platform is too expensive for a
+small edge node. This project provides practical, auditable control over a
+homelab or laboratory perimeter while remaining maintainable under constrained
+CPU and RAM.
 
-## 3. Justificación Técnica de Decisiones de Diseño (Nivel Senior)
+The implementation addresses four problems:
 
-### 3.1. Mitigación de Degradación en Almacenamiento Sólido (Flash/SD)
+- **Perimeter exposure:** restrict management and administrative ports.
+- **Incident visibility:** collect security scores, failed SSH attempts,
+  Fail2Ban bans and honeypot events.
+- **Operational resilience:** verify health, create backups and roll back unsafe
+  updates.
+- **Local decision support:** generate security reports through a local LLM
+  without sending device data to the cloud.
 
-Los dispositivos embebidos basados en tarjetas MicroSD sufren de corrupción prematura de datos debido a la alta frecuencia de operaciones de escritura (*Write Amplification*). Para mitigar este vector de fallo físico:
+## Implemented capabilities
 
-* **DietPi-Ramlog Interception:** El sistema desvía los buffers de registro hacia memoria volátil (RAM).
-* **Análisis Focalizado:** Se configuró la jaula de Fail2Ban (`nginx-http-auth`) para auditar exclusivamente el descriptor de archivo `/var/log/nginx/edge-sec-agent-error.log`, optimizando el consumo de CPU y evitando escrituras síncronas en disco por cada intento de intrusión.
+### Perimeter hardening
 
-### 3.2. Endurecimiento de la Capa de Transporte (Capa 7 HTTP/TLS)
+- Nginx TLS 1.2/1.3 termination on port `8443`.
+- HTTP Basic Authentication and a `5 requests/s` rate limit.
+- Security headers including HSTS, `X-Frame-Options`, CSP-friendly framing
+  controls, MIME sniffing protection and referrer policy.
+- Persistent and idempotent IPv4/IPv6 firewall rules.
+- Legacy SSH port `22` blocked.
+- Dropbear administration restricted to the Tailscale interface on port `2222`.
+- Gunicorn and Ollama bound to loopback only.
+- Fail2Ban integration for SSH and Nginx authentication failures.
+- Dedicated Cowrie SSH honeypot on port `2223`.
 
-El archivo `nginx_agent.conf` implementa un perfil estricto de criptografía asimétrica:
+### Monitoring and observability
 
-* **Restricción de Cifrado:** Se deshabilitan protocolos inseguros (TLS 1.0 y 1.1), forzando el uso exclusivo de TLS 1.2 y TLS 1.3 con suites de cifrado basadas en curvas elípticas con secreto perfecto hacia adelante (*Perfect Forward Secrecy*).
-* **Cabeceras de Hardening:** Inyección sistemática de cabeceras HTTP (`Strict-Transport-Security`, `X-Frame-Options DENY`, `X-Content-Type-Options nosniff`) para anular vectores de ataque como Cross-Site Scripting (XSS) y Clickjacking.
+- Flask REST API behind Nginx.
+- Prometheus-compatible `/metrics` endpoint.
+- Live security metrics at `/api/metrics`.
+- Structured health endpoint at `/v1/global/health`.
+- SQLite/WAL persistence with 30-day metric retention.
+- CPU temperature, RAM, uptime, SSH failures, open ports and Fail2Ban bans.
+- Build and last-update metadata in metrics.
+- Aggregated Cowrie telemetry without exposing passwords or commands.
 
-## 4. Matriz de Controles de Seguridad Implementados
+### Local edge AI
 
-| Control Implementado | Mecanismo de Verificación | Estado Operativo |
-| :--- | :--- | :---: |
-| Oclusión de Puerto Estándar (22) | `iptables -L INPUT -n -v` (Verificación de política DROP) | Confirmado |
-| Ofuscación de SSH de Gestión | Escucha activa Dropbear en puerto `2222` | Confirmado |
-| Robustez Criptográfica | Verificación TLS mediante negociación local OpenSSL | Confirmado |
-| Control de Flujo (Rate Limiting) | Directiva `limit_req_zone` limitada a 5r/s con ráfaga (*burst*) de 10 | Confirmado |
-| Control de Acceso Capa 7 | Validación de vectores criptográficos en `/etc/nginx/.htpasswd` | Confirmado |
-| Monitorización de Fuerza Bruta | Jaula Fail2Ban analizando firmas de error 401 en Nginx | Confirmado |
-| Integridad de Base de Datos | Rutina automatizada de depuración SQLite `prune_old_metrics(days=30)` | Confirmado |
-| Resiliencia de Procesos | Orquestación mediante unidades de servicio de Systemd (`Restart=always`) | Confirmado |
+- Ollama on loopback, with `tinyllama:1.1b` for the production security report.
+- OpenAI-shaped `/v1/models` and `/v1/chat/completions` endpoints.
+- Legacy `/ask` compatibility.
+- Isolated Cowrie RAG CLI using `nomic-embed-text` and `sqlite-vec`.
+- No PyTorch dependency in the RAG environment.
 
-## 5. Guías Operacionales e Instrucciones de Uso
+### Automation and recovery
 
-### 5.1. Ejecución de Simulación de Ataque Automatizado (Live Demo)
+- systemd watchdog every two minutes.
+- Hourly backup timer with SQLite integrity checks.
+- SHA-256 backup manifests and configurable retention.
+- Restore workflow for SQLite and reports.
+- Opt-in, locked safe-update timer.
+- Pre-update validation and health-check based rollback.
+- Explicit protection against updating `main` or `master` without consent.
 
-Para validar de forma empírica la convergencia entre Nginx (Detección de accesos no autorizados) y el Firewall (Bloqueo de red), se ha dispuesto un script de pruebas determinista en `tests/live_demo_trigger.ps1` ejecutable en consolas Windows PowerShell 5.1+:
+## Infrastructure topology
 
-```powershell
-# Acceder a la raíz del espacio de trabajo
-cd C:\Users\jaime\edge-sec-agent
+```text
+Internet / LAN
+      |
+      v
+Nginx :8443
+TLS + Basic Auth + rate limiting + security headers
+      |
+      v
+Gunicorn :5000
+loopback only
+      |
+      +--> Flask API
+      |       |
+      |       +--> SQLite /opt/edge-sec-agent/data/history.db
+      |       +--> Local reports and backups
+      |
+      +--> Ollama :11434
+              loopback only
 
-# Lanzar el script de auditoría perimetral dinámica
-.\tests\live_demo_trigger.ps1
+Tailscale tailnet
+      |
+      +--> Dropbear :2222
+      +--> Cowrie honeypot :2223
+      +--> Administration endpoints
 ```
 
-El script realiza un login exitoso inicial (HTTP 200) seguido de ráfagas controladas de logins erróneos. Al alcanzar el umbral crítico configurado en el archivo jail.local (maxretry = 3), el script capturará un error inmediato de denegación de conexión física, confirmando el baneo en caliente de la IP emisora.
+### Network exposure
 
-### 5.2. Comandos de Administración del Sistema de Seguridad (Orange Pi SSH)
+| Port | Service | Exposure | Controls |
+|---:|---|---|---|
+| `22` | Legacy SSH | None | IPv4/IPv6 `DROP` |
+| `2222` | Dropbear | Tailscale interface | Tailnet-only access |
+| `8443` | Nginx | Configured network interfaces | TLS, authentication, rate limit, headers |
+| `5000` | Gunicorn | `127.0.0.1` | Loopback only |
+| `11434` | Ollama | `127.0.0.1` | Loopback only |
+| `2223` | Cowrie | Tailscale interface | Isolated user, directory and network filtering |
+| `41641/UDP` | Tailscale | Tailnet transport | WireGuard tunnel |
 
-Para gestionar las contingencias o monitorizar la actividad del agente desde la terminal Linux de la placa (Puerto 2222), utilice las siguientes herramientas de consola:
+The complete documented topology is in
+[`docs/architecture.txt`](docs/architecture.txt).
 
-Inspección del Estado de la Jaula HTTP:
+## Honesty about deployment status
+
+The following points are based on the device and repository evidence collected
+for this project:
+
+| Area | Verified state |
+|---|---|
+| Repository secrets | Legacy Telegram token and Basic Auth password rotated |
+| Chat report endpoint | Repaired and tested |
+| Firewall | Persistent IPv4/IPv6 rules, without flushing Tailscale chains |
+| CI | x86_64 and native ARM64 matrix |
+| Production host | Orange Pi Zero 3 / Debian 13 validated manually |
+| Honeypot | Cowrie isolated, Tailscale-only, tested with controlled access |
+| Honeypot telemetry | Cowrie JSON log captured and summarized |
+| RAG | CLI Phase 2 completed and validated |
+| Automatic updates | Implemented but disabled by default |
+
+The public Internet honeypot sensor is not enabled by default. Captured
+Tailscale and local events prove the sensor works, but they are not evidence of
+public Internet attacks. Real public capture would require an explicit router
+port-forwarding decision.
+
+## Quick start
+
+### Requirements
+
+- Orange Pi Zero 3 or compatible ARM64 Debian 13 system.
+- Minimum 450 MB available memory and 2 GB free disk space for the bootstrap.
+- Root access for initial service installation.
+- Debian/DietPi compatibility.
+- Optional Tailscale for remote administration.
+- Optional Ollama for local AI reports.
+
+### One-command bootstrap
 
 ```bash
-fail2ban-client status nginx-http-auth
+curl -fsSL https://raw.githubusercontent.com/jqime/edge-sec-agent/main/install.sh \
+  | sudo bash -s stable
 ```
 
-Remoción Manual de Bloqueo (Unban IP):
+The bootstrap clones the selected channel, creates the `edgesec` service user,
+prepares persistent directories, creates the application virtual environment,
+installs systemd units and activates the core services.
+
+### Manual bootstrap
 
 ```bash
-fail2ban-client set nginx-http-auth unbanip <IP_OBJETIVO>
+git clone https://github.com/jqime/edge-sec-agent.git
+cd edge-sec-agent
+sudo ./scripts/bootstrap_debian_arm64.sh --channel stable
 ```
 
-Trazabilidad de Logs de Error en Tiempo Real:
+Use `--dry-run` to validate architecture, OS, memory and repository availability
+before applying changes:
 
 ```bash
-tail -f /var/log/nginx/edge-sec-agent-error.log
+sudo ./scripts/bootstrap_debian_arm64.sh --channel stable --dry-run
 ```
 
-### 5.3. Kit de Herramientas de Diagnóstico MCP (Model Context Protocol)
+### Verify the installation
 
-El repositorio incorpora un conjunto de scripts ejecutables dentro del directorio `mcp_tools/` diseñados para auditorías sanitarias del sistema de manera automatizada:
+```bash
+curl -s http://127.0.0.1:5000/v1/global/health
+curl -s http://127.0.0.1:5000/api/metrics
+curl -s http://127.0.0.1:5000/metrics
 
-* `./mcp_tools/check_fail2ban`: Retorna métricas analíticas sobre el volumen de IPs bloqueadas.
-* `./mcp_tools/check_connections`: Mapea los sockets de red abiertos en interfaces de escucha.
-* `./mcp_tools/show_history`: Extrae resúmenes estadísticos de la base de datos analítica SQLite.
-
-### 5.4. Estructura del Repositorio
-
-```
-edge-sec-agent/
-├── src/
-│   ├── agent.py              # Motor principal de análisis de seguridad
-│   ├── sec_web.py            # Aplicación Flask (endpoints REST)
-│   └── database.py           # Persistencia SQLite + retención automática
-├── mcp_tools/                # Herramientas de diagnóstico ejecutables
-│   ├── check_disk            # Uso de disco y espacio disponible
-│   ├── check_cpu             # Carga de CPU y core count
-│   ├── check_ram             # Uso de memoria RAM
-│   ├── check_fail2ban        # Estado de jails e IPs bloqueadas
-│   ├── check_connections     # Conexiones de red activas
-│   ├── check_updates         # Actualizaciones de sistema pendientes
-│   ├── check_processes       # Procesos en ejecución
-│   ├── show_history          # Historial de métricas de seguridad
-│   └── log-analyzer          # Análisis de logs del sistema
-├── scripts/
-│   ├── sec                   # CLI principal del agente
-│   ├── sec-agent             # Wrapper de ejecución del agente
-│   ├── sec-chat              # CLI para chat y herramientas MCP
-│   ├── remote_deploy.sh      # Script de despliegue automatizado (7 pasos)
-│   └── security_audit.sh     # Auditoría automatizada de 5 controles perimetrales
-├── tests/
-│   └── live_demo_trigger.ps1 # Simulación de ataque fuerza bruta (PowerShell 5.1)
-├── docs/
-│   ├── presentation_guide.md # Guía de defensa ante tribunal
-│   ├── api_spec.yaml         # Contrato OpenAPI 3.0.3 de los endpoints REST
-│   └── architecture.txt      # Diagrama de flujo arquitectónico
-├── .github/workflows/
-│   └── ci.yml                # Pipeline CI/CD (GitHub Actions)
-├── edge-sec-agent.service    # Unit de systemd para Gunicorn
-├── nginx_agent.conf          # Configuración de Nginx reverse proxy
-├── wsgi.py                   # Entry point WSGI para producción
-├── Dockerfile                # Definición de contenedor alternativo
-├── Makefile                  # Orquestador de comandos locales
-├── requirements.txt          # Dependencias Python formales
-├── secrets.env.example       # Plantilla de variables de entorno
-├── LICENSE                   # Licencia MIT
-├── CHANGELOG.md              # Historial de versiones
-└── README.md                 # Documentación técnica (este archivo)
+systemctl status edge-sec-agent edge-firewall
+systemctl list-timers --all | grep edge
+journalctl -u edge-sec-agent -f
 ```
 
----
+The public API is also served through Nginx on port `8443` and requires Basic
+Authentication.
 
-**Especificaciones de Entorno:** Hardware: Orange Pi Zero 3 (ARM64) | Sistema Operativo: DietPi v12 (Debian Bookworm) | Estado del Entorno: Producción Verificada.
+## API surface
 
-## 6. Operación reproducible y mantenible (nuevo)
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/v1/global/health` | `GET` | Dependencies, temperature, RAM, uptime and health state |
+| `/api/metrics` | `GET` | Live security score and infrastructure metrics |
+| `/metrics` | `GET` | Prometheus text exposition |
+| `/v1/models` | `GET` | OpenAI-shaped model discovery |
+| `/v1/chat/completions` | `POST` | Security report compatible with OpenAI clients |
+| `/ask` | `POST` | Legacy security report endpoint |
+| `/api/honeypot/summary` | `GET` | Aggregate Cowrie counts and source IPs |
 
-Para una ruta reproducible desde cero (bootstrap + systemd + backup/restore + update seguro), consulta:
+The honeypot summary intentionally excludes usernames, passwords and command
+payloads. The OpenAPI contract is maintained in
+[`docs/api_spec.yaml`](docs/api_spec.yaml).
 
-- `/docs/OPERATIONS.md`
-- `/docs/RECOVERY_RUNBOOK.md`
+## Operations
 
-Puntos clave:
+Canonical installation layout:
 
-- despliegue idempotente en `/opt/edge-sec-agent`
-- separación de código/configuración/datos
-- backup con verificación de integridad SQLite
-- actualización segura opt-in con lock, health check y rollback
-- watchdog de salud que reinicia solo `edge-sec-agent`
+```text
+/opt/edge-sec-agent/
+├── app/current/       Versioned repository and scripts
+├── app/venv/          Application Python environment
+├── config/            Non-secret runtime environment
+├── data/              SQLite database and update metadata
+├── reports/           Generated security reports
+├── backups/           Verified backups
+├── logs/              Service-owned runtime logs
+└── secrets.env        Local secrets, excluded from Git
+```
 
-## 7. Limitaciones - Datos que NO se restauran desde Git
+Use the operations and recovery runbooks for deployment, restore and incident
+procedures:
 
-**Clonar el repositorio o ejecutar bootstrap no restaura automáticamente:**
+- [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
+- [`docs/RECOVERY_RUNBOOK.md`](docs/RECOVERY_RUNBOOK.md)
+- [`docs/HONEYPOT.md`](docs/HONEYPOT.md)
+- [`docs/RAG.md`](docs/RAG.md)
 
-- **Tailscale** y credenciales de red: es necesario autenticar `tailscale login` y configurar claves nuevamente.
-- **Certificados TLS** y claves privadas: deben restaurarse desde backup seguro o vuelto a emitir.
-- **Basic Auth** en Nginx (`/etc/nginx/.htpasswd`): credenciales que se deben configurar manualmente o restaurar desde backup.
-- **Modelos Ollama**: `tinyllama:1.1b` u otros modelos deben instalarse con `ollama pull` después del despliegue.
-- **Credenciales Git** y tokens: no se almacenan en el repositorio por seguridad.
-- **Configuración externa de Nginx**: reglas de rate limiting, IP whitelist, dominios adicionales.
-- **Claves SSH** de usuarios del sistema: deben gestionarse por el administrador del sistema.
-- **Datos de la base de SQLite** `history.db`: el schema se restaura desde Git, pero los datos insertados se pierden a menos que se respalden con `backup_state.sh`.
+### Backup
 
-**SÍ se restaura desde Git:**
+```bash
+sudo /opt/edge-sec-agent/app/current/scripts/backup_state.sh
+```
 
-- Código fuente de `src/`, `scripts/`, `systemd/`
-- Schema y estructura de `history.db` (tablas, triggers)
-- Configuración de sistema no sensible (`EDGE_MODEL`, `EDGE_TIMEOUT`, etc. en `edge-sec-agent.env`)
-- Unidades de systemd y timers
-- Docs y configuración no sensible
+### Restore
 
-**Para restaurar todo el entorno:**
+```bash
+sudo /opt/edge-sec-agent/app/current/scripts/restore_state.sh \
+  /opt/edge-sec-agent/backups/<timestamp>
+```
 
-1. Ejecutar bootstrap: `sudo ./scripts/bootstrap_debian_arm64.sh --channel stable`
-2. Restaurar backup: `sudo ./scripts/restore_state.sh /opt/edge-sec-agent/backups/<timestamp>`
-3. Configurar Tailscale: `tailscale login`
-4. Pull modelos Ollama: `ollama pull tinyllama:1.1b`
-5. Configurar credenciales Basic Auth: `htpasswd /etc/nginx/.htpasswd <usuario>`
-6. Verificar salud: `curl http://127.0.0.1:5000/v1/global/health`
+Backups include SQLite data, reports, a manifest and SHA-256 checksums. SQLite
+copies are checked with `PRAGMA integrity_check` before they are considered
+valid.
 
----
+### Opt-in safe updates
 
-**Especificaciones de Entorno:** Hardware: Orange Pi Zero 3 (ARM64) | Sistema Operativo: DietPi v12 (Debian Bookworm) | Estado del Entorno: Producción Verificada.
+```bash
+sudo mkdir -p /etc/edge-sec-agent
+sudo touch /etc/edge-sec-agent/update.enabled
+sudo systemctl enable --now edge-sec-agent-update.timer
+```
+
+The updater rejects dirty local repositories, locks concurrent executions,
+backs up before changing the checkout, runs validation, restarts only the agent,
+checks health and restores the previous commit when the service fails.
+
+## Development and testing
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+
+.venv/bin/pytest tests/ -q
+.venv/bin/pytest tests/ -m integration -q
+.venv/bin/ruff check src/ tests/
+.venv/bin/mypy src/ --ignore-missing-imports
+python3 -m compileall src/
+bash -n scripts/*.sh install.sh
+```
+
+The CI pipeline validates Python, shell syntax and systemd units on both
+`ubuntu-latest` and a native ARM64 runner. An integration test executes the real
+agent binary with isolated database and report paths.
+
+## Security model and limitations
+
+- Secrets must remain outside Git, with restrictive ownership and permissions.
+- Nginx authentication protects the HTTP administration plane.
+- Gunicorn and Ollama are only reachable through loopback.
+- Tailscale restricts administrative and honeypot ingress.
+- systemd uses a non-login service user, `ProtectHome=true`,
+  `ProtectSystem=strict` and restricted writable paths where applicable.
+- A firewall unit does not flush unrelated Tailscale or Docker chains.
+- CI validates architecture compatibility but cannot replace host-specific
+  thermal, network and hardware testing.
+- The RAG CLI is intentionally isolated from the production virtual environment.
+- Current RAG responses are suitable for delayed, factual log consultation, not
+  real-time incident analysis.
+- The repository history has been purged of legacy secrets, but GitHub objects
+  retained by the platform or external clones are outside repository control.
+- One non-secret bloat artifact remains in Git history pending an explicit,
+  owner-approved `filter-repo` operation.
+
+## Roadmap
+
+The prioritized backlog is documented in [`docs/ROADMAP.md`](docs/ROADMAP.md).
+The next safe improvements are:
+
+1. Merge and validate the reproducible bootstrap change in CI.
+2. Add pre-commit secret and static-analysis enforcement.
+3. Add contract tests for `docs/api_spec.yaml`.
+4. Expand integration coverage beyond the chat report path.
+5. Add Telegram threshold alerts for temperature, RAM and security score.
+6. Add an optional Grafana/Prometheus node for dashboards.
+7. Integrate the isolated Cowrie RAG as an opt-in API feature only after
+   capacity and performance validation.
+
+## Project documentation
+
+| Document | Description |
+|---|---|
+| [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | Deployment, services and firewall operation |
+| [`docs/RECOVERY_RUNBOOK.md`](docs/RECOVERY_RUNBOOK.md) | Backup and recovery procedures |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Design decisions and request flow |
+| [`docs/HONEYPOT.md`](docs/HONEYPOT.md) | Cowrie installation, evidence and limitations |
+| [`docs/RAG.md`](docs/RAG.md) | Isolated Cowrie RAG architecture and usage |
+| [`docs/api_spec.yaml`](docs/api_spec.yaml) | OpenAPI 3.0.3 REST contract |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Prioritized improvements |
+
+## License
+
+Distributed under the MIT License. See [`LICENSE`](LICENSE).
