@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-11-20
+
+### Added
+- Single-command ARM64 bootstrap entry point (`install.sh`) for the stable channel.
+- Honeypot summary endpoint (`/api/honeypot/summary`) with aggregated event counts and source IPs.
+- Live security score calculation for health and Prometheus endpoints.
+- Deployment metadata persisted in `data/last_update.json`.
+- Compatibility paths for legacy installations under `/opt/edge-sec-agent`.
+- Professional project README describing architecture, deployment, operations and limitations.
+
+### Changed
+- Production systemd units use `/opt/edge-sec-agent/app/current` and `/opt/edge-sec-agent/app/venv`.
+- Backup, health, firewall and Cowrie units use canonical deployment paths.
+- Safe updater uses the installed application virtual environment.
+- Git operations accept the service-owned checkout without global `safe.directory` changes.
+- CI uses `actions/checkout@v4`, `actions/setup-python@v5` and explicit read-only permissions.
+
+### Fixed
+- Systemd validation now substitutes Cowrie and firewall executable paths.
+- OpenAPI model and honeypot schemas are structurally consistent.
+- Legacy production layouts are preserved during bootstrap instead of being replaced.
+- Prometheus no longer reports stale or null security score values when SQLite has no recent metric.
+
+### Validated
+- CI passed on `ubuntu-latest` and `ubuntu-24.04-arm`.
+- Orange Pi Zero 3 deployment reports `HEALTHY`.
+- Ollama, SQLite, Cowrie, Nginx, Fail2Ban, Tailscale and the edge timers are active.
+
 ## [1.1.0] - 2026-10-17
 
 ### Security
