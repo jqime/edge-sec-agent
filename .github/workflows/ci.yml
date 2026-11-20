@@ -39,6 +39,11 @@ jobs:
     - name: Lint con Ruff
       run: ruff check src/ tests/
 
+    - name: Secret scanning con Gitleaks
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Type check con Mypy
       run: mypy src/ --ignore-missing-imports
 

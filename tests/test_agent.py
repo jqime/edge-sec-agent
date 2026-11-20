@@ -6,6 +6,7 @@ import pytest
 
 # ── Fixtures ──────────────────────────────────────────────────────────────
 
+
 @pytest.fixture(autouse=True)
 def _isolate_db():
     """Usa BD temporal para evitar efectos secundarios en import de agent.py."""
@@ -22,8 +23,15 @@ def _isolate_db():
 @pytest.fixture(autouse=True)
 def _clean_env():
     """Limpia variables que agent.py lee al cargar."""
-    for k in ("SSH_LOG_PATHS", "EDGE_MODEL", "EDGE_MAX_TOKENS", "EDGE_TIMEOUT", "REPORTS_DIR",
-              "SECRETS_PATH", "EDGE_SECRETS_PATH"):
+    for k in (
+        "SSH_LOG_PATHS",
+        "EDGE_MODEL",
+        "EDGE_MAX_TOKENS",
+        "EDGE_TIMEOUT",
+        "REPORTS_DIR",
+        "SECRETS_PATH",
+        "EDGE_SECRETS_PATH",
+    ):
         os.environ.pop(k, None)
     yield
 
@@ -33,29 +41,32 @@ from src import agent
 
 # ── _compute_score ────────────────────────────────────────────────────────
 
+
 class TestComputeScore:
     def test_max_score_no_issues(self):
         assert agent._compute_score(0, [], None, None) == 100
 
     def test_ssh_failures_penalty(self):
-        assert agent._compute_score(5, [], None, None) == 90   # 5*2=10
-        assert agent._compute_score(30, [], None, None) == 40   # 30*2=60
-        assert agent._compute_score(50, [], None, None) == 40   # capped at 60
+        assert agent._compute_score(5, [], None, None) == 90  # 5*2=10
+        assert agent._compute_score(30, [], None, None) == 40  # 30*2=60
+        assert agent._compute_score(50, [], None, None) == 40  # capped at 60
 
     def test_risk_ports_penalty(self):
-        assert agent._compute_score(0, ["8080"], None, None) == 92   # 1*8=8
-        assert agent._compute_score(0, ["8080", "3306", "21", "23", "111"], None, None) == 60  # 5*8=40 capped
+        assert agent._compute_score(0, ["8080"], None, None) == 92  # 1*8=8
+        assert (
+            agent._compute_score(0, ["8080", "3306", "21", "23", "111"], None, None) == 60
+        )  # 5*8=40 capped
 
     def test_allowed_ports_no_penalty(self):
         assert agent._compute_score(0, ["22", "80", "443", "25", "53"], None, None) == 100
 
     def test_temperature_penalty(self):
-        assert agent._compute_score(0, [], 60.0, None) == 93   # (60-55)*1.5=7.5→int=7, 100-7=93
-        assert agent._compute_score(0, [], 80.0, None) == 75   # (80-55)*1.5=37.5→25 capped
+        assert agent._compute_score(0, [], 60.0, None) == 93  # (60-55)*1.5=7.5→int=7, 100-7=93
+        assert agent._compute_score(0, [], 80.0, None) == 75  # (80-55)*1.5=37.5→25 capped
 
     def test_ram_penalty(self):
-        assert agent._compute_score(0, [], None, 70.0) == 92   # (70-60)*0.8=8
-        assert agent._compute_score(0, [], None, 95.0) == 75   # capped at 25
+        assert agent._compute_score(0, [], None, 70.0) == 92  # (70-60)*0.8=8
+        assert agent._compute_score(0, [], None, 95.0) == 75  # capped at 25
 
     def test_combined_penalties(self):
         score = agent._compute_score(10, ["8080"], 60.0, 70.0)
@@ -63,11 +74,12 @@ class TestComputeScore:
         assert score == expected
 
     def test_score_floor_zero(self):
-        score = agent._compute_score(100, ["8080"]*10, 100.0, 100.0)
+        score = agent._compute_score(100, ["8080"] * 10, 100.0, 100.0)
         assert score == 0
 
 
 # ── _count_ssh_failures ──────────────────────────────────────────────────
+
 
 class TestCountSshFailures:
     SSH_LOG_PATHS = "/var/log/test_auth.log"
@@ -79,7 +91,10 @@ class TestCountSshFailures:
             "Feb 10 10:01:00 host sshd[124]: Failed password for invalid user admin from 10.0.0.2 port 22 ssh2\n"
             "Feb 10 10:02:00 host sshd[125]: Accepted password for root from 10.0.0.1 port 22 ssh2\n"
         )
-        with patch("builtins.open", mock_open(read_data=log_content)), patch.dict(os.environ, {"SSH_LOG_PATHS": self.SSH_LOG_PATHS}, clear=False):
+        with (
+            patch("builtins.open", mock_open(read_data=log_content)),
+            patch.dict(os.environ, {"SSH_LOG_PATHS": self.SSH_LOG_PATHS}, clear=False),
+        ):
             assert agent._count_ssh_failures() == 2
 
     @patch("os.path.exists", return_value=True)
@@ -88,7 +103,10 @@ class TestCountSshFailures:
             "Feb 10 10:00:00 host sshd[123]: Authentication failure for root from 10.0.0.1 port 22\n"
             "Feb 10 10:01:00 host login[456]: authentication failure; logname= uid=0 euid=0 tty=ssh\n"
         )
-        with patch("builtins.open", mock_open(read_data=log_content)), patch.dict(os.environ, {"SSH_LOG_PATHS": self.SSH_LOG_PATHS}, clear=False):
+        with (
+            patch("builtins.open", mock_open(read_data=log_content)),
+            patch.dict(os.environ, {"SSH_LOG_PATHS": self.SSH_LOG_PATHS}, clear=False),
+        ):
             assert agent._count_ssh_failures() == 2
 
     @patch("os.path.exists", return_value=True)
@@ -99,7 +117,10 @@ class TestCountSshFailures:
             "Feb 10 10:02:00 host sshd[125]: Connection closed by 10.0.0.1 port 22\n"
             "Feb 10 10:03:00 host sshd[126]: Did not receive identification string from 10.0.0.2\n"
         )
-        with patch("builtins.open", mock_open(read_data=log_content)), patch.dict(os.environ, {"SSH_LOG_PATHS": self.SSH_LOG_PATHS}, clear=False):
+        with (
+            patch("builtins.open", mock_open(read_data=log_content)),
+            patch.dict(os.environ, {"SSH_LOG_PATHS": self.SSH_LOG_PATHS}, clear=False),
+        ):
             assert agent._count_ssh_failures() == 2
 
     @patch("os.path.exists", return_value=False)
@@ -121,23 +142,30 @@ class TestCountSshFailures:
 
 # ── _get_ram_usage_percent ───────────────────────────────────────────────
 
+
 class TestGetRamUsagePercent:
     def test_typical_values(self):
-        meminfo = "MemTotal:       8000000 kB\nMemFree:        1000000 kB\nMemAvailable:   4000000 kB\n"
+        meminfo = (
+            "MemTotal:       8000000 kB\nMemFree:        1000000 kB\nMemAvailable:   4000000 kB\n"
+        )
         with patch("builtins.open", mock_open(read_data=meminfo)):
             pct = agent._get_ram_usage_percent()
             assert pct is not None
             assert abs(pct - 50.0) < 0.01  # (8000-4000)/8000*100 = 50
 
     def test_high_usage(self):
-        meminfo = "MemTotal:       8000000 kB\nMemFree:         500000 kB\nMemAvailable:   1000000 kB\n"
+        meminfo = (
+            "MemTotal:       8000000 kB\nMemFree:         500000 kB\nMemAvailable:   1000000 kB\n"
+        )
         with patch("builtins.open", mock_open(read_data=meminfo)):
             pct = agent._get_ram_usage_percent()
             assert pct is not None
             assert abs(pct - 87.5) < 0.01
 
     def test_low_usage(self):
-        meminfo = "MemTotal:       8000000 kB\nMemFree:        6000000 kB\nMemAvailable:   7500000 kB\n"
+        meminfo = (
+            "MemTotal:       8000000 kB\nMemFree:        6000000 kB\nMemAvailable:   7500000 kB\n"
+        )
         with patch("builtins.open", mock_open(read_data=meminfo)):
             pct = agent._get_ram_usage_percent()
             assert pct is not None
@@ -158,6 +186,7 @@ class TestGetRamUsagePercent:
 
 
 # ── _format_report ───────────────────────────────────────────────────────
+
 
 class TestFormatReport:
     def test_perfect_score_no_recommendations(self):
@@ -212,13 +241,16 @@ class TestFormatReport:
 
 # ── SECRETS_PATH ─────────────────────────────────────────────────────────
 
+
 class TestSecretsPath:
     def test_secrets_path_is_systemd_safe(self):
         from src.agent import SECRETS_PATH
+
         assert "/root/" not in SECRETS_PATH
         assert SECRETS_PATH.endswith("secrets.env")
 
     def test_secrets_path_default_derives_from_project_root(self):
         import os as _os
+
         root = _os.path.dirname(_os.path.dirname(_os.path.abspath(agent.__file__)))
         assert agent.SECRETS_PATH == _os.path.join(root, "secrets.env")

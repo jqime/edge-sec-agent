@@ -34,13 +34,20 @@ def client():
 def _stable_dependencies():
     with (
         patch("src.sec_web._check_ollama", return_value={"ok": True, "latency_ms": 1.0}),
-        patch("src.sec_web._check_sqlite", return_value={"ok": True, "detail": "ok", "latency_ms": 1.0}),
-        patch("src.sec_web._last_update_info", return_value={"updated_at": None, "commit": "abc", "channel": "stable"}),
+        patch(
+            "src.sec_web._check_sqlite",
+            return_value={"ok": True, "detail": "ok", "latency_ms": 1.0},
+        ),
+        patch(
+            "src.sec_web._last_update_info",
+            return_value={"updated_at": None, "commit": "abc", "channel": "stable"},
+        ),
     ):
         yield
 
 
 # ── /v1/global/health ────────────────────────────────────────────────────
+
 
 class TestHealth:
     @patch("src.sec_web._get_live_security_score", return_value=85)
@@ -75,7 +82,9 @@ class TestHealth:
     @patch("src.sec_web._get_uptime_seconds", return_value=0.0)
     @patch("src.sec_web._get_fail2ban_banned_ips", return_value=0)
     @patch("src.sec_web.get_latest", return_value=None)
-    def test_degraded_high_temp(self, mock_latest, mock_banned, mock_uptime, mock_ram, mock_temp, client):
+    def test_degraded_high_temp(
+        self, mock_latest, mock_banned, mock_uptime, mock_ram, mock_temp, client
+    ):
         resp = client.get("/v1/global/health")
         data = resp.get_json()
         assert resp.status_code == 503
@@ -87,7 +96,9 @@ class TestHealth:
     @patch("src.sec_web._get_uptime_seconds", return_value=0.0)
     @patch("src.sec_web._get_fail2ban_banned_ips", return_value=0)
     @patch("src.sec_web.get_latest", return_value=None)
-    def test_degraded_high_ram(self, mock_latest, mock_banned, mock_uptime, mock_ram, mock_temp, client):
+    def test_degraded_high_ram(
+        self, mock_latest, mock_banned, mock_uptime, mock_ram, mock_temp, client
+    ):
         resp = client.get("/v1/global/health")
         data = resp.get_json()
         assert resp.status_code == 503
@@ -99,7 +110,9 @@ class TestHealth:
     @patch("src.sec_web._get_uptime_seconds", return_value=0.0)
     @patch("src.sec_web._get_fail2ban_banned_ips", return_value=0)
     @patch("src.sec_web.get_latest", return_value=None)
-    def test_warnings_not_degraded(self, mock_latest, mock_banned, mock_uptime, mock_ram, mock_temp, client):
+    def test_warnings_not_degraded(
+        self, mock_latest, mock_banned, mock_uptime, mock_ram, mock_temp, client
+    ):
         resp = client.get("/v1/global/health")
         data = resp.get_json()
         assert resp.status_code == 200
@@ -116,6 +129,7 @@ class TestHealth:
 
 
 # ── /metrics ─────────────────────────────────────────────────────────────
+
 
 class TestMetrics:
     @patch("src.sec_web._get_live_security_score", return_value=90)
@@ -144,13 +158,16 @@ class TestMetrics:
 
 # ── /api/metrics ─────────────────────────────────────────────────────────
 
+
 class TestApiMetrics:
     @patch("src.sec_web._count_ssh_failures", return_value=5)
     @patch("src.sec_web._get_open_ports", return_value=["8080"])
     @patch("src.sec_web._get_temperature_c", return_value=55.0)
     @patch("src.sec_web._get_ram_usage_percent", return_value=70.0)
     @patch("src.sec_web._compute_score", return_value=85)
-    def test_returns_full_metrics(self, mock_score, mock_ram, mock_temp, mock_ports, mock_ssh, client):
+    def test_returns_full_metrics(
+        self, mock_score, mock_ram, mock_temp, mock_ports, mock_ssh, client
+    ):
         resp = client.get("/api/metrics")
         assert resp.status_code == 200
         data = resp.get_json()
@@ -163,6 +180,7 @@ class TestApiMetrics:
 
 
 # ── /v1/models ───────────────────────────────────────────────────────────
+
 
 class TestModels:
     def test_list_models(self, client):
@@ -204,6 +222,7 @@ class TestHoneypotSummary:
 
 # ── / and dashboard ──────────────────────────────────────────────────────
 
+
 class TestIndex:
     def test_dashboard_html(self, client):
         resp = client.get("/")
@@ -218,6 +237,7 @@ class TestIndex:
 
 
 # ── Chat path tests ────────────────────────────────────────────────────────
+
 
 def _assert_real_script(args):
     """Comprueba que el primer argumento es la ruta real y ejecutable de sec-agent."""
@@ -305,6 +325,7 @@ def test_chat_integration_runs_real_agent(client, tmp_path, monkeypatch):
 
 
 # ── Bootstrap validation ──────────────────────────────────────────────────
+
 
 def test_bootstrap_no_ls_route():
     """Comprueba que el script bootstrap no usa 'git ls-route' (comando inexistente)."""
