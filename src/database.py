@@ -1,9 +1,9 @@
-
 """
 database.py — Módulo de persistencia SQLite unificado para Edge Sec Agent.
 Almacena métricas de seguridad, hardware y rendimiento en una sola tabla.
 Usado por agent.py (CLI) y sec_web.py (API).
 """
+
 import logging
 import os
 import sqlite3
@@ -141,9 +141,7 @@ def get_metrics(limit: int = 100, order: str = "DESC") -> list[dict[str, Any]]:
 def get_latest() -> dict[str, Any] | None:
     conn = _get_conn()
     try:
-        row = conn.execute(
-            "SELECT * FROM metrics ORDER BY id DESC LIMIT 1"
-        ).fetchone()
+        row = conn.execute("SELECT * FROM metrics ORDER BY id DESC LIMIT 1").fetchone()
         return dict(row) if row else None
     except sqlite3.Error as exc:
         logger.error("Error al leer última métrica: %s", exc)
@@ -181,9 +179,7 @@ def prune_old_metrics(days: int = 30) -> int:
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
     conn = _get_conn()
     try:
-        deleted = conn.execute(
-            "DELETE FROM metrics WHERE timestamp < ?", (cutoff,)
-        ).rowcount
+        deleted = conn.execute("DELETE FROM metrics WHERE timestamp < ?", (cutoff,)).rowcount
         conn.commit()
         if deleted:
             logger.info("Podadas %d métricas anteriores a %s días", deleted, days)

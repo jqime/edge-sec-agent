@@ -284,6 +284,14 @@ python3 -m compileall src/
 bash -n scripts/*.sh install.sh
 ```
 
+To install commit checks locally:
+
+```bash
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
 The CI pipeline validates Python, shell syntax and systemd units on both
 `ubuntu-latest` and a native ARM64 runner. An integration test executes the real
 agent binary with isolated database and report paths.

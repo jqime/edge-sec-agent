@@ -20,6 +20,7 @@ Variables de entorno:
     RAG_LLM_MODEL    modelo de chat (default qwen2.5:1.5b)
     RAG_MAX_TOKENS   tope de tokens a generar (default 220; CPU ~1.3 tok/s)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -117,8 +118,7 @@ def cmd_ingest(_args: argparse.Namespace) -> None:
             continue
         vector = embed(text)
         db.execute(
-            "INSERT INTO events(embedding, eventid, src_ip, ts, content) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO events(embedding, eventid, src_ip, ts, content) VALUES (?, ?, ?, ?, ?)",
             (
                 sqlite_vec.serialize_float32(vector),
                 str(event.get("eventid", "")),
@@ -149,9 +149,7 @@ def build_digest(events: list[dict]) -> str:
         ip = str(event.get("src_ip", "?"))
         ip_counts[ip] = ip_counts.get(ip, 0) + 1
     lines = ["RESUMEN REAL DEL HONEYPOT:"]
-    lines.append(
-        "Eventos por IP: " + ", ".join(f"{ip}={c}" for ip, c in sorted(ip_counts.items()))
-    )
+    lines.append("Eventos por IP: " + ", ".join(f"{ip}={c}" for ip, c in sorted(ip_counts.items())))
     logins = [e for e in events if e.get("eventid") == "cowrie.login.success"]
     if logins:
         lines.append("Logins exitosos:")
